@@ -471,7 +471,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
       client.newCall({
         destinationNumber,
         callerNumber: formattedCallerNumber,
-        callerName: 'Jazz Caller',
+        callerName: 'Cold Call Machine',
       });
     },
     [connectionStatus]

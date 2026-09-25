@@ -326,7 +326,7 @@ export function useTelnyxCall(): UseTelnyxCallReturn {
     client.newCall({
       destinationNumber,
       callerNumber: callerNumber || callerNumberRef.current || '',
-      callerName: 'Jazz Caller',
+      callerName: 'Cold Call Machine',
     });
   }, [connectionStatus]);
 
