@@ -11,7 +11,7 @@ const sampleTestimonials: Testimonial[] = [
     avatarSrc: "https://randomuser.me/api/portraits/women/57.jpg",
     name: "Sarah Chen",
     handle: "@sarahdigital",
-    text: "DialerJazz transformed our outbound flow. The power dialer saves us hours every day!",
+    text: "Cold Call Machine transformed our outbound flow. The power dialer saves us hours every day!",
   },
   {
     avatarSrc: "https://randomuser.me/api/portraits/men/64.jpg",
@@ -124,7 +124,7 @@ export default function LoginPage() {
       setIsLoading(true);
       try {
         await verifyEmail(email, otp);
-        toast.success("Email verified! Welcome to DialerJazz.");
+        toast.success("Email verified! Welcome to The SalesCloser Cold Call Machine.");
       } catch (err: any) {
         toast.error(err?.message || "Invalid or expired verification code.");
       } finally {
@@ -165,7 +165,7 @@ export default function LoginPage() {
   };
 
   const descMap: Record<string, string> = {
-    signin: "Sign in to your DialerJazz dashboard and start dialing",
+    signin: "Sign in to the Cold Call Machine and start dialing",
     signup: "Enter your details to create a new account",
     "verify-email": `Enter the 6-digit code sent to ${email}`,
     "forgot-step1": "Enter your email to receive a recovery code",
@@ -200,7 +200,7 @@ export default function LoginPage() {
           <div className="flex flex-col gap-6">
             {/* Logo for mobile */}
             <div className="md:hidden flex justify-center mb-2">
-              <img src="/logo.png" alt="DialerJazz" className="h-20 w-auto object-contain" />
+              <img src="/logo.png" alt="The SalesCloser Cold Call Machine" className="h-20 w-auto object-contain" />
             </div>
 
             <h1 className="animate-element animate-delay-100 text-4xl md:text-5xl font-semibold leading-tight">
@@ -217,7 +217,7 @@ export default function LoginPage() {
                     <input
                       name="email"
                       type="email"
-                      placeholder="sales@jazzcaller.app"
+                      placeholder="sales@salescloser.ai"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       autoComplete="off"
@@ -334,7 +334,7 @@ export default function LoginPage() {
             <p className="animate-element animate-delay-900 text-center text-sm text-muted-foreground">
               {mode === "signin" && (
                 <>
-                  New to DialerJazz?{" "}
+                  New to The SalesCloser Cold Call Machine?{" "}
                   <button onClick={() => setMode("signup")} className="text-violet-400 hover:underline transition-colors">
                     Create Account
                   </button>
@@ -403,7 +403,7 @@ export default function LoginPage() {
         >
           <img
             src="/logo.png"
-            alt="DialerJazz"
+            alt="The SalesCloser Cold Call Machine"
             className="size-full object-cover"
           />
         </div>

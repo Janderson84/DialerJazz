@@ -1,0 +1,9 @@
+{
+  "project_id": "fa4e0000-1234-5678-90ab-cd1234567890",
+  "project_name": "local",
+  "org_id": "fa4e0001-1234-5678-90ab-cd1234567890",
+  "appkey": "local",
+  "region": "local",
+  "api_key": "ik_2b35804355cf32774f51f7111371f940151cfc3b",
+  "oss_host": "http://localhost:7130"
+}
