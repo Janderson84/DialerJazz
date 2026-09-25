@@ -124,7 +124,7 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 3001;
 if (process.env.NODE_ENV !== 'test') {
   httpServer.listen(PORT, () => {
-    console.log(`🚀 Jazz Caller API running on http://localhost:${PORT}`);
+    console.log(`🚀 SalesCloser Cold Call Machine API running on http://localhost:${PORT}`);
   });
 }
 

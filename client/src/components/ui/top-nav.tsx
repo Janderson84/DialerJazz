@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 function getBreadcrumbs(pathname: string) {
   const segments = pathname.split("/").filter(Boolean);
-  const crumbs = [{ label: "DialerJazz", href: "/dashboard" }];
+  const crumbs = [{ label: "Cold Call Machine", href: "/dashboard" }];
   
   if (segments.length > 0) {
     crumbs.push({ 

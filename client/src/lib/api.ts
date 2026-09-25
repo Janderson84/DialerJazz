@@ -35,7 +35,7 @@ export interface PaginationParams {
 }
 
 /**
- * Authenticated fetch wrapper for Jazz Caller backend API.
+ * Authenticated fetch wrapper for Cold Call Machine backend API.
  * Uses the cached access token set by AuthContext.
  */
 async function apiFetch<T = unknown>(
