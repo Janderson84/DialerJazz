@@ -6,7 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { requireAutl, AuthenticatedRequest } from './middleware/auth.js';
+import { requireAuth, AuthenticatedRequest } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 import settingsRouter from './routes/settings.js';
@@ -58,7 +58,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Protected Route Example
-app.get('/api/me', requireAutl, (req: AuthenticatedRequest, res, next) => {
+app.get('/api/me', requireAuth, (req: AuthenticatedRequest, res, next) => {
   try {
     res.json({
       message: 'Authentication successful',
@@ -69,7 +69,7 @@ app.get('/api/me', requireAutl, (req: AuthenticatedRequest, res, next) => {
   }
 });
 
-// ─── Rate Limiting ────────────────────────────────────────
+// ─── Rate Limiting ─────────────────────────────────────────
 // General: 100 requests per minute per IP
 app.set('trust proxy', 1); // behind the jackhamr tunnel / single reverse proxy
 
