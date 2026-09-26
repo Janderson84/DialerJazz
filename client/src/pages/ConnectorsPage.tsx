@@ -381,7 +381,7 @@ export default function ConnectorsPage() {
 
           <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 mb-4">
             <p className="text-xs text-blue-600 dark:text-blue-400 leading-relaxed">
-              <span className="font-semibold">How it works:</span> When you start a Local SIM campaign, clicking &ldquo;Call&rdquo; opens your phone&apos;s native dialer with the lead&apos;s number. After you hang up and return to the app, the disposition sheet appears so you can log the outcome.
+              <span className="font-semibold">How it works:</span> When you start a Local SIM campaign, clicking &ldquo;Call&rdquo; opens your phone&apos;s native dialer with the lead&apos;s number. After the call, return to this tab to log the disposition.
             </p>
           </div>
 
