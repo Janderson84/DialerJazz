@@ -1,12 +1,39 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Plug, CheckCircle2, XCircle, ArrowRight, Smartphone } from 'lucide-react';
-import { settingsApi } from '@/lib/api';
+import { settingsApi, apiFetch } from '@/lib/api';
 import type { UserSettings } from '@/lib/api';
 import Select from '@/components/ui/select';
 
+const MASTER_USER_ID_CLIENT = 'a4d41720-59e1-4850-8b15-e8841872e702';
+
 export default function ConnectorsPage() {
-  const [settings, setSettings] = useState<UserSettings | null>(null);
+
+  // ── Pipedrive ──
+  const isMaster = user?.id === MASTER_USER_ID_CLIENT;
+  const [pdToken, setPdToken] = useState('');
+  const [pdConnecting, setPdConnecting] = useState(false);
+  const [pdStatus, setPdStatus] = useState<{ connected: boolean }>({ connected: false });
+  useEffect(() => {
+    apiFetch<{ data: { connected: boolean } }>('/pipedrive/status', { method: 'GET' })
+      .then((r) => setPdStatus({ connected: r.data.connected }))
+      .catch(() => setPdStatus({ connected: false }));
+  }, []);
+  const connectPipedrive = async () => {
+    setPdConnecting(true);
+    try {
+      await apiFetch('/pipedrive/token', { method: 'POST', body: JSON.stringify({ api_token: pdToken }) });
+      const r = await apiFetch<{ data: { connected: boolean } }>('/pipedrive/status', { method: 'GET' });
+      setPdStatus({ connected: r.data.connected });
+      setPdToken('');
+    } catch (e: any) {
+      alert(e?.message || 'Pipedrive connection failed');
+    } finally {
+      setPdConnecting(false);
+    }
+  };
+
+  const { user } = useAuth();  const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   // Telnyx Modal State
@@ -290,6 +317,51 @@ export default function ConnectorsPage() {
           </button>
         </div>
 
+        {/* Pipedrive Card */}
+        <div className="relative overflow-hidden rounded-[1.5rem] border border-black/5 dark:border-white/5 bg-surface p-6 transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+          <div className="flex items-start justify-between">
+            <div className="h-12 w-12 rounded-[0.85rem] bg-[#26592d]/10 border border-[#26592d]/20 flex items-center justify-center text-[#26592d] font-bold text-lg mb-4">
+              Pd
+            </div>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-background px-3 py-1 text-xs font-semibold uppercase tracking-wider text-foreground border border-black/10 dark:border-white/10 shadow-sm">
+              {pdStatus.connected ? (
+                <><CheckCircle2 className="h-3.5 w-3.5" /> API Connected</>
+              ) : (
+                <><XCircle className="h-3 w-3" /> Not Connected</>
+              )}
+            </span>
+          </div>
+          <h3 className="text-lg font-semibold text-foreground mb-1">Pipedrive CRM</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Import open deals as dialer leads and log every call back to the deal automatically.
+          </p>
+          {isMaster && (
+            <div className="flex gap-2 mb-3">
+              <input
+                type="password"
+                value={pdToken}
+                onChange={(e) => setPdToken(e.target.value)}
+                placeholder="Paste Pipedrive API token"
+                className="flex-1 rounded-[0.85rem] border border-black/10 dark:border-white/10 bg-background px-3 py-2 text-sm"
+              />
+              <button
+                onClick={connectPipedrive}
+                disabled={!pdToken || pdConnecting}
+                className="rounded-[0.85rem] bg-foreground text-background px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-40"
+              >
+                {pdConnecting ? 'Verifying…' : 'Connect'}
+              </button>
+            </div>
+          )}
+          <div className="text-xs text-muted-foreground">
+            {pdStatus.connected
+              ? 'Connected — deal import available in every campaign.'
+              : isMaster
+                ? 'Get the token: Pipedrive → Profile → Personal preferences → API → Your personal API token.'
+                : 'Connected by the account owner. Ask James if you need deal imports enabled.'}
+          </div>
+        </div>
+
         {/* Local SIM Card */}
         <div className="relative overflow-hidden rounded-[1.5rem] border border-black/5 dark:border-white/5 bg-surface p-6 transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
           <div className="flex items-start justify-between">
@@ -309,7 +381,7 @@ export default function ConnectorsPage() {
 
           <div className="rounded-xl bg-blue-500/10 border border-blue-500/20 p-3 mb-4">
             <p className="text-xs text-blue-600 dark:text-blue-400 leading-relaxed">
-              <span className="font-semibold">How it works:</span> When you start a Local SIM campaign, clicking &ldquo;Call&rdquo; opens your phone&apos;s native dialer with the lead&apos;s number. After the call, return to this tab to log the disposition.
+              <span className="font-semibold">How it works:</span> When you start a Local SIM campaign, clicking &ldquo;Call&rdquo; opens your phone&apos;s native dialer with the lead&apos;s number. After you hang up and return to the app, the disposition sheet appears so you can log the outcome.
             </p>
           </div>
 
