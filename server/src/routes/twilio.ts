@@ -2,6 +2,10 @@ import express, { Router, Request, Response } from 'express';
 import twilio from 'twilio';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
+
+const PUBLIC_BASE_URL = () =>
+  process.env.PUBLIC_BASE_URL || 'https://2c3de6c6d1ba--5173.jackhamr.app';
 
 const router = Router();
 const { AccessToken } = twilio.jwt;
@@ -14,14 +18,11 @@ router.post('/token', requireAuth, async (req: AuthenticatedRequest, res, next) 
     const userId = req.user?.id;
     if (!userId) throw new ApiError(401, 'Unauthorized', 'auth_required');
 
-    // Fetch Twilio credentials from user_settings
-    const { data: settings, error } = await req.db!.database
-      .from('user_settings')
-      .select('twilio_account_sid, twilio_api_key, twilio_api_secret, twilio_twiml_app_sid')
-      .eq('user_id', userId)
-      .single();
+    // Fetch Twilio credentials — reps dial through the MASTER's Twilio account
+    const master = await getMasterTwilioSettings();
+    const settings = master || null;
 
-    if (error || !settings?.twilio_account_sid) {
+    if (!settings?.twilio_account_sid) {
       throw new ApiError(400, 'Twilio Account SID not configured. Go to Connectors page.', 'config_missing');
     }
     if (!settings?.twilio_api_key || !settings?.twilio_api_secret) {
@@ -74,16 +75,21 @@ router.post('/voice', express.urlencoded({ extended: false }), (req: Request, re
       return;
     }
 
-    if (to) {
-      // If "To" looks like a phone number, dial it
-      if (/^[\d+\-() ]+$/.test(to)) {
-        const dial = twiml.dial({ callerId: from });
-        dial.number(to);
-      } else {
-        // Could be a client identity — dial as client
-        const dial = twiml.dial({ callerId: from });
-        dial.client(to);
-      }
+    if (to && /^[\d+\-() ]+$/.test(to)) {
+      // Outbound to a phone number — use answering machine detection with a
+      // rep-aware callback. If the callee is a machine, Twilio drops the rep's
+      // voicemail; if human, the callback bridges the call to the rep's browser.
+      const repId = (req.query.rep as string) || MASTER_ID();
+      const clean = to.replace(/[^\d+]/g, '');
+      const amd = twiml.dial({ callerId: from, machineDetection: 'DetectMessageEnd', machineDetectionTimeout: 10 } as any);
+      amd.number({
+        url: `${PUBLIC_BASE_URL()}/api/voicemail/amd-callback?rep=${repId}`,
+        method: 'POST',
+      } as any, clean);
+    } else if (to) {
+      // Client identity — dial as client (internal transfer)
+      const dial = twiml.dial({ callerId: from });
+      dial.client(to);
     } else {
       twiml.say('No destination number was provided.');
     }
@@ -94,6 +100,37 @@ router.post('/voice', express.urlencoded({ extended: false }), (req: Request, re
     const twiml = new twilio.twiml.VoiceResponse();
     twiml.say('An application error occurred.');
     res.type('text/xml').status(500).send(twiml.toString());
+  }
+});
+
+
+// ── POST /api/twilio/inbound ────────────────────────────────────────
+// Inbound voice webhook for per-rep numbers. Routes the call to the
+// rep's registered browser client (identity: user_<repUserId>).
+// Rep id comes from the query string that provisionRepNumber baked in.
+router.post('/inbound', express.urlencoded({ extended: false }), async (req: Request, res: Response) => {
+  try {
+    const twiml = new twilio.twiml.VoiceResponse();
+    const repId = (req.query.rep as string) || '';
+    const from = req.body.From || req.body.Caller || 'Unknown';
+    console.log(`[Twilio Inbound] Call to rep ${repId || '<none>'} from ${from}`);
+
+    let targetClient = `user_${repId}`;
+    if (!/^[0-9a-f-]{36}$/i.test(repId)) {
+      // Fallback: ring the master's browser
+      targetClient = `user_${MASTER_ID()}`;
+      console.log('[Twilio Inbound] invalid rep id, falling back to master');
+    }
+
+    const dial = twiml.dial({ callerId: from, timeout: 25 });
+    dial.client(targetClient);
+    // If the rep doesn't answer, take a voicemail
+    twiml.say('The person you are calling is unavailable. Please leave a message after the tone.');
+
+    res.type('text/xml').send(twiml.toString());
+  } catch (err) {
+    console.error('[Twilio Inbound] Error:', err);
+    res.status(500).type('text/xml').send('<Response><Say>An error occurred.</Say></Response>');
   }
 });
 
