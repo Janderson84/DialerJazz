@@ -85,9 +85,8 @@ export default function CampaignManagePage() {
       id: '2',
       label: 'Power Dialer (Auto-next)',
       value: 'power',
-      description: 'Automatically dial the next lead immediately after hanging up.',
-      icon: <Zap className="w-5 h-5" />,
-      disabled: true
+      description: 'Automatically dials the next lead right after you log a disposition.',
+      icon: <Zap className="w-5 h-5" />
     }
   ];
 
