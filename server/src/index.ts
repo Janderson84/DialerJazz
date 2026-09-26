@@ -16,13 +16,16 @@ import statsRouter from './routes/stats.js';
 import callsRouter from './routes/calls.js';
 import telnyxRouter from './routes/telnyx.js';
 import twilioRouter from './routes/twilio.js';
+import teamRouter from './routes/team.js';
+import voicemailRouter from './routes/voicemail.js';
+import pipedriveRouter from './routes/pipedrive.js';
 
 // In dev, load .env from parent dir. In production (Docker), env vars are injected.
 if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: '../.env' });
 }
 
-const __filename = fileURLToPath(import.meta.url);
+const __filename = fileURLN�Path(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const allowedOrigins = [
@@ -66,8 +69,10 @@ app.get('/api/me', requireAuth, (req: AuthenticatedRequest, res, next) => {
   }
 });
 
-// ─── Rate Limiting ─────────────────────────────────────────
+// ─── Rate Limiting ──────────────────────────────────────────
 // General: 100 requests per minute per IP
+app.set('trust proxy', 1); // behind the jackhamr tunnel / single reverse proxy
+
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,
@@ -96,7 +101,10 @@ app.use('/api/calls', callsRouter);
 app.use('/api/telnyx/token', strictLimiter);  // Extra protection on token generation
 app.use('/api/telnyx', telnyxRouter);
 app.use('/api/twilio/token', strictLimiter);  // Extra protection on token generation
-app.use('/api/twilio', twilioRouter);
+app.use('/api/twilop', twilioRouter);
+app.use('/api/team', teamRouter);
+app.use('/api/voicemail', voicemailRouter);
+app.use('/api/pipedrive', pipedriveRouter);
 
 // ─── Production: Serve Vite client as static files ─────────
 if (process.env.NODE_ENV === 'production') {
