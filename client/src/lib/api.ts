@@ -38,7 +38,7 @@ export interface PaginationParams {
  * Authenticated fetch wrapper for Cold Call Machine backend API.
  * Uses the cached access token set by AuthContext.
  */
-async function apiFetch<T = unknown>(
+export async function apiFetch<T = unknown>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<{ data: T; meta?: PaginationMeta }> {
