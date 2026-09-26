@@ -88,7 +88,18 @@ router.post('/verify-telnyx', async (req: AuthenticatedRequest, res: Response, n
     });
 
     if (!telnyxRes.ok) {
-      return res.status(400).json({ error: { code: 'invalid_key', message: 'Invalid Telnyx API Key' } });
+      const errText = await telnyxRes.text().catch(() => '');
+      console.error(`[verify-telnyx] Telnyx rejected key: HTTP ${telnyxRes.status} — ${errText}`);
+      // Surface the upstream reason so the user knows WHY (bad key vs test-mode key vs outage)
+      const upstream = (() => {
+        try { return JSON.parse(errText)?.errors?.[0]?.detail || errText.slice(0, 200); } catch { return errText.slice(0, 200); }
+      })();
+      return res.status(400).json({
+        error: {
+          code: 'invalid_key',
+          message: `Telnyx rejected this key (HTTP ${telnyxRes.status}). ${upstream || 'Double-check it is a v2 API key (starts with KEY...) from Voice > API Keys — not a legacy App Secret.'}`,
+        },
+      });
     }
 
     // Save to user_settings if valid
@@ -233,7 +244,11 @@ router.get('/twilio/balance', async (req: AuthenticatedRequest, res: Response, n
       }
     });
 
-    if (!response.ok) throw new Error('Failed to fetch Twilio balance');
+    if (!response.ok) {
+      // Some accounts (e.g. without balance resource) 404 here — treat as no data, not an error
+      console.warn('[twilio/balance] non-OK response:', response.status);
+      return res.json({ data: null });
+    }
     const data = await response.json();
     res.json({ data });
   } catch (error) {
