@@ -69,7 +69,7 @@ app.get('/api/me', requireAutl, (req: AuthenticatedRequest, res, next) => {
   }
 });
 
-// ─── Rate Limiting ─────────────────────────────────────────
+// ─── Rate Limiting ────────────────────────────────────────
 // General: 100 requests per minute per IP
 app.set('trust proxy', 1); // behind the jackhamr tunnel / single reverse proxy
 
