@@ -137,7 +137,7 @@ export function SessionNavBar({ isCollapsed, onToggle }: SessionNavBarProps) {
                   <div className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     Overview
                   </div>
-                 )}
+                )}
                 <div className="space-y-1">
                   <NavItem
                     href="/dashboard"
@@ -248,7 +248,7 @@ export function SessionNavBar({ isCollapsed, onToggle }: SessionNavBarProps) {
       {/* Mobile sidebar (full overlay) */}
       <nav
         className={cn(
-          "llg:hidden fixed inset-y-0 left-0 z-[70] w-64 bg-white dark:bg-[#0F0F12] transform transition-transform duration-200 ease-in-out border-r border-gray-200 dark:border-[#1F1F23]",
+          "lg:hidden fixed inset-y-0 left-0 z-[70] w-64 bg-white dark:bg-[#0F0F12] transform transition-transform duration-200 ease-in-out border-r border-gray-200 dark:border-[#1F1F23]",
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -292,7 +292,7 @@ export function SessionNavBar({ isCollapsed, onToggle }: SessionNavBarProps) {
       {/* Mobile overlay */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 bg-black/50z-[65] lg:hidden"
+          className="fixed inset-0 bg-black/50 z-[65] lg:hidden"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
