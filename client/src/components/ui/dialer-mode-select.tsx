@@ -53,8 +53,8 @@ export function DialerModeSelect({ value, onChange }: DialerModeSelectProps) {
         "w-full rounded-2xl overflow-hidden cursor-pointer select-none border transition-all duration-300 ease-out shadow-sm hover:shadow",
         "bg-background",
         isOpen ? "border-primary shadow-primary/5" : "border-input hover:border-foreground/30",
-        isOpen ? "rounded-2xl : "rounded-2xl"
-        )}
+        isOpen ? "rounded-2xl" : "rounded-2xl"
+      )}
     >
       {/* Header (Trigger) */}
       <div 
@@ -62,7 +62,7 @@ export function DialerModeSelect({ value, onChange }: DialerModeSelectProps) {
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className={cn(
-          "flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-300 hrink-0",
+          "flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-300 shrink-0",
           isOpen ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
         )}>
           {selectedMode.icon}
@@ -73,7 +73,7 @@ export function DialerModeSelect({ value, onChange }: DialerModeSelectProps) {
             className={cn(
               "text-sm text-muted-foreground transition-all duration-300",
               isOpen ? "opacity-0 max-h-0 mt-0" : "opacity-100 max-h-6 mt-1"
-             )}
+            )}
           >
             {selectedMode.description}
           </p>
@@ -110,13 +110,13 @@ export function DialerModeSelect({ value, onChange }: DialerModeSelectProps) {
                       setIsOpen(false);
                     }}
                     className={cn(
-                       "flex items-start gap-4 rounded-xl p-3 border",
+                      "flex items-start gap-4 rounded-xl p-3 border",
                       "transition-all duration-300 ease-out",
                       isSelected 
                         ? "bg-primary/5 border-primary/50 shadow-sm" 
                         : (mode.disabled ? "opacity-40 border-transparent cursor-not-allowed" : "border-transparent hover:bg-muted/50 cursor-pointer"),
                       isOpen ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
-                     )}
+                    )}
                     style={{
                       transitionDelay: isOpen ? `${index * 50}ms` : "0ms",
                     }}
@@ -133,9 +133,9 @@ export function DialerModeSelect({ value, onChange }: DialerModeSelectProps) {
                           "text-sm font-semibold",
                           isSelected ? "text-primary" : "text-foreground"
                         )}>
-                        {mode.title}
-                      </h4>
-                      {mode.disabled && (
+                          {mode.title}
+                        </h4>
+                        {mode.disabled && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-muted/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                             <Lock className="h-3 w-3" /> Coming Soon
                           </span>

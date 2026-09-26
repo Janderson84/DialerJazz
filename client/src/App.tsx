@@ -15,6 +15,7 @@ import CampaignDialerPage from './pages/CampaignDialerPage';
 import CampaignManagePage from './pages/CampaignManagePage';
 import ManualDialerPage from './pages/ManualDialerPage';
 import CallLogsPage from './pages/CallLogsPage';
+import TeamPage from './pages/TeamPage';
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
@@ -88,6 +89,7 @@ function App() {
           <Route path="/connectors" element={<ConnectorsPage />} />
           <Route path="/dialer" element={<ManualDialerPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/team" element={<TeamPage />} />
         </Route>
       </Routes>
     </div>
