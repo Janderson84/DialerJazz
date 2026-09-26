@@ -19,7 +19,7 @@ import { twilioApi, settingsApi } from '@/lib/api';
 
 import type { ConnectionStatus, CallState, QualityMetrics } from './TelnyxContext';
 
-// ── Types ────────────────────────────────────────────────────────────
+// ── Types ───────────────────────────────────────────────────────────
 export interface TwilioContextValue {
   // Connection
   connectionStatus: ConnectionStatus;
@@ -122,7 +122,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // ── Helper to attach Call event listeners ──────────────────────────
+  // ── Helper to attach Call event listeners ─────────────────────────
   const attachCallListeners = useCallback((call: Call) => {
     console.log('[TwilioContext] Attaching listeners to call:', call.parameters);
 
@@ -184,7 +184,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     });
   }, [startPrimaryTimer, stopPrimaryTimer]);
 
-  // ── Connect to Twilio ──────────────────────────────────────────────
+  // ── Connect to Twilio ───────────────────────────────────────────
   const initConnection = useCallback(async () => {
     if (deviceRef.current) {
       try { deviceRef.current.destroy(); } catch { /* noop */ }
@@ -201,6 +201,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       if (!settings?.twilio_account_sid || !settings?.twilio_api_key) {
         setSipConfigured(false);
         setConnectionStatus('disconnected');
+        // Surface WHY instead of hanging on "Connecting" forever
+        if (!settings?.twilio_account_sid) {
+          setError('Twilio account not connected. Open Connectors and save your Account SID + Auth Token.');
+        } else {
+          setError(
+            'Twilio voice credentials missing. Open Connectors > Twilio and save the API Key SID, API Secret, TwiML App SID and Caller Number — the account connection alone cannot place calls.'
+          );
+        }
         return;
       }
 
@@ -299,7 +307,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setIsHeld(false);
   }, [stopPrimaryTimer]);
 
-  // ── Call actions ───────────────────────────────────────────────────
+  // ── Call actions ──────────────────────────────────────────────────
   const dial = useCallback(
     (destinationNumber: string, callerNumber?: string) => {
       const device = deviceRef.current;
@@ -310,7 +318,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       const resolvedCallerNumber = callerNumber || callerNumberRef.current || '';
 
       // Validate caller number is present - Twilio requires a verified callerId for outbound calls
-      if (!resolvedCallerNumber || !/^\+?\d{10,15}$/.test(resolvedCallerNumber.replace(/[\s\-()]/g, ''))) {
+      if (!resolvedCallerNumber || !/\+?\d{10,15}$/.test(resolvedCallerNumber.replace(/[\s\-()]/g, ''))) {
         console.error('[TwilioContext] Invalid or missing caller number:', resolvedCallerNumber);
         setError('Caller ID not configured. Please set a verified phone number in Connectors > Twilio.');
         return;
@@ -329,6 +337,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         params: {
           To: destinationNumber,
           From: resolvedCallerNumber,
+          Rep: user?.id || '',
         },
       }).then((call) => {
         console.log('[TwilioContext] device.connect() succeeded, call parameters:', call.parameters);
@@ -402,7 +411,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleHold = useCallback(() => {
-    console.warn('[TwilioContext] Hold is not directly supported in Twilio browser SDK');
+    console.warn '[TwilioContext] Hold is not directly supported in Twilio browser SDK';
     // In real implementation, this would require TwiML conference or REST API
   }, []);
 
@@ -467,7 +476,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// ── Hook ─────────────────────────────────────────────────────────────
+// ── Hook ───────────────────────────────────────────────────────────────────
 export function useTwilioContext(): TwilioContextValue {
   const ctx = useContext(TwilioContext);
   if (!ctx) {
