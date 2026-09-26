@@ -221,7 +221,7 @@ router.post('/assign', async (req: AuthenticatedRequest, res: Response, next: Ne
 router.patch('/:id/disposition', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const dispositionSchema = z.object({
-      status: z.enum(['new', 'calling', 'answered', 'no_answer', 'voicemail', 'busy', 'failed', 'dnc'])
+      status: z.enum(['new', 'calling', 'answered', 'follow_up', 'not_interested', 'no_answer', 'voicemail', 'busy', 'failed', 'dnc'])
     });
     const { status } = dispositionSchema.parse(req.body);
 
