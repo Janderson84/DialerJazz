@@ -156,19 +156,21 @@ export default function CampaignDialerPage() {
     setIsDetailsExpanded(false); // reset on next lead
   }, [currentLead]);
 
-  const handleDial = () => {
-    if (!currentLead) return;
+  const handleDialForLead = (lead: Lead | undefined) => {
+    if (!lead) return;
 
     // Local SIM: use tel: URI, skip WebRTC entirely
     if (campaign?.provider === 'local') {
-      localCall(currentLead.phone);
+      localCall(lead.phone);
       return;
     }
 
     if (!voice.sipConfigured) return toast.error('Configure a telephony provider in Connectors first.');
     if (voice.connectionStatus !== 'registered') return toast.error('Connecting...');
-    voice.dial(currentLead.phone);
+    voice.dial(lead.phone);
   };
+
+  const handleDial = () => handleDialForLead(currentLead);
 
   const handleHangUp = () => {
     voice.hangup();
@@ -203,9 +205,24 @@ export default function CampaignDialerPage() {
       setShowDisposition(false);
 
       if (dialerSessionMode === 'power') {
-        // Auto-swipe in 1.5 seconds if power dialer
+        // Power dialer: auto-swipe to next lead, then auto-dial it.
+        const isLast = currentIndex >= leads.length - 1;
+        if (isLast) {
+          toast.success('All leads dialed! 🎉');
+          return;
+        }
         setTimeout(() => {
-           triggerSwipeLeft();
+          void (async () => {
+            // Swipe the card away first (fires navigateNext internally)
+            await triggerSwipeLeft();
+            // Small settle delay, then dial the next lead automatically
+            setTimeout(() => {
+              const next = leads[currentIndex + 1];
+              if (next && !['trying', 'ringing', 'active'].includes(voice.primaryCallState)) {
+                handleDialForLead(next);
+              }
+            }, 1200);
+          })();
         }, 1500);
       }
       // If click-to-call, we do nothing and wait for manual swipe!
