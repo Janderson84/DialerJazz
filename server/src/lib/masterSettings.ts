@@ -30,7 +30,7 @@ export async function getMasterTwilioSettings(): Promise<Record<string, string |
   const password = process.env.INSFORGE_ADMIN_PASSWORD;
   if (!password) return null;
 
-  const res = await fetch(`d{base}/api/auth/admin/sessions`, {
+  const res = await fetch(`${base}/api/auth/admin/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password }),
@@ -73,7 +73,7 @@ export function isRep(userId: string): boolean {
 export async function getMasterSettingsField(field: string): Promise<string | null> {
   const base = process.env.INFORGE_URL || process.env.INSFORGE_URL || 'http://localhost:7130';
   const username = process.env.INSFORGE_ADMIN_USER || 'admin';
-  const password = process.env.INSFORGE_PASSWORD;
+  const password = process.env.INSFORGE_ADMIN_PASSWORD;
   if (!password) return null;
   const res = await fetch(`${base}/api/auth/admin/sessions`, {
     method: 'POST',
