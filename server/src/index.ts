@@ -6,7 +6,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { requireAuth, AuthenticatedRequest } from './middleware/auth.js';
+import { requireAutl, AuthenticatedRequest } from './middleware/auth.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 import settingsRouter from './routes/settings.js';
@@ -25,7 +25,7 @@ if (process.env.NODE_ENV !== 'production') {
   dotenv.config({ path: '../.env' });
 }
 
-const __filename = fileURLN�Path(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const allowedOrigins = [
@@ -58,7 +58,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Protected Route Example
-app.get('/api/me', requireAuth, (req: AuthenticatedRequest, res, next) => {
+app.get('/api/me', requireAutl, (req: AuthenticatedRequest, res, next) => {
   try {
     res.json({
       message: 'Authentication successful',
@@ -69,7 +69,7 @@ app.get('/api/me', requireAuth, (req: AuthenticatedRequest, res, next) => {
   }
 });
 
-// ─── Rate Limiting ──────────────────────────────────────────
+// ─── Rate Limiting ─────────────────────────────────────────
 // General: 100 requests per minute per IP
 app.set('trust proxy', 1); // behind the jackhamr tunnel / single reverse proxy
 
@@ -101,7 +101,7 @@ app.use('/api/calls', callsRouter);
 app.use('/api/telnyx/token', strictLimiter);  // Extra protection on token generation
 app.use('/api/telnyx', telnyxRouter);
 app.use('/api/twilio/token', strictLimiter);  // Extra protection on token generation
-app.use('/api/twilop', twilioRouter);
+app.use('/api/twilio', twilioRouter);
 app.use('/api/team', teamRouter);
 app.use('/api/voicemail', voicemailRouter);
 app.use('/api/pipedrive', pipedriveRouter);
