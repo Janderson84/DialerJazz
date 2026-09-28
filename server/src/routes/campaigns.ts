@@ -109,6 +109,52 @@ router.patch('/:id/status', async (req: AuthenticatedRequest, res: Response, nex
   }
 });
 
+// POST /api/campaigns/:id/finish
+// Marks a campaign completed and promotes retry-worthy leads (voicemail, no_answer,
+// busy, failed, not yet at max attempts) into the user's evergreen "Retries" campaign.
+router.post('/:id/finish', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const { data: campaign, error: findError } = await req.db!
+      .database.from('campaigns')
+      .select('id, is_evergreen')
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.id)
+      .single();
+
+    if (findError || !campaign) throw new ApiError(404, 'Campaign not found', 'not_found');
+    if (campaign.is_evergreen) throw new ApiError(400, 'The Retries campaign is evergreen and cannot be finished.', 'invalid_operation');
+
+    const { data, error } = await req.db!
+      .database.rpc('promote_to_evergreen', {
+        p_campaign_id: req.params.id,
+        p_user_id: req.user.id,
+      });
+
+    if (error) {
+      console.error('[campaigns/finish] promote RPC error:', error);
+      throw new ApiError(500, error.message, 'db_error');
+    }
+
+    const result = Array.isArray(data) ? data[0] : data;
+    await req.db!.database
+      .from('campaigns')
+      .update({ status: 'completed', updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.id);
+
+    res.json({
+      data: {
+        campaign_id: req.params.id,
+        status: 'completed',
+        promoted_to_retries: Number(result?.promoted ?? 0),
+        cycled_out_of_retries: Number(result?.cycled_out ?? 0),
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.patch('/:id/config', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const configSchema = z.object({
