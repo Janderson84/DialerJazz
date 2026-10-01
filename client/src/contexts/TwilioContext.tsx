@@ -277,7 +277,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       };
       loglevel.setLevel(loglevel.levels.DEBUG);
       // Telemetry sink: post SDK lifecycle events to the server so stuck calls
-      // can be diagnosed from the diag timeline instead of guesswork.
+      // are diagnosable from logs alone (his browser console is invisible to us).
       const diag = (event: string, detail?: string) => {
         try {
           fetch('/api/diag/event', {
@@ -287,74 +287,130 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           }).catch(() => {});
         } catch { /* noop */ }
       };
-
+      window.addEventListener('error', (e) => diag('window.onerror', String(e.message).slice(0, 200)));
       diag('bundle.version', 'diag5-beaconed-sdk');
 
-      const device = new Device(tokenRes.data.token, {
-        codecPreferences: ['opus', 'pcmu'] as any,
-      });
-      // Explicit proven mic: enumerate audioinput devices at init and pick a real
-      // one (not 'default'/'communications') so the SDK never stalls acquiring
-      // an unavailable default device.
-      let provenDeviceId: string | undefined;
+      // Enumerate mics once so we can hand Twilio a verified-working device.
+      // Root cause of the silent dial failure: Twilio's openDefaultDeviceWithConstraints()
+      // fails on stale/default mic selection (device ID drift after hotplug, exclusive
+      // use, etc.) and disconnects without surfacing the error. Passing an explicit
+      // deviceId that we just proven openable avoids the whole failure path.
+      let preferredMicId: string | undefined;
       try {
-        const devs = await navigator.mediaDevices.enumerateDevices();
-        const mics = devs.filter((d) => d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications');
-        if (mics.length) {
-          provenDeviceId = mics[0].deviceId;
-          console.log('[TwilioContext] Proven mic deviceId:', provenDeviceId);
-        }
-      } catch (e) {
-        console.warn('[TwilioContext] Mic enumeration failed:', e);
-      }
-      try {
-        await device.updateOptions({ ...(provenDeviceId ? { audioInputDevices: [provenDeviceId as any] } : {}) } as any);
-      } catch (e) {
-        console.warn('[TwilioContext] updateOptions with mic failed:', e);
+        const probeStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        preferredMicId = probeStream.getAudioTracks()[0]?.getSettings?.().deviceId;
+        probeStream.getTracks().forEach((t) => t.stop());
+      } catch (micErr: any) {
+        console.error('[TwilioContext] Microphone probe failed:', micErr);
+        setError(
+          'Microphone blocked. Click the icon at the left of the address bar, set Microphone to Allow, then reload and dial again.'
+        );
+        return;
       }
 
+      const device = new Device(tokenRes.data.token, {
+        logLevel: 1, // DEBUG
+        codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
+        getInputStream: preferredMicId
+          ? async () => {
+              // Re-open the proven mic each dial (fresh tracks per call).
+              return navigator.mediaDevices.getUserMedia({
+                audio: { deviceId: { exact: preferredMicId } },
+              });
+            }
+          : undefined,
+      });
+
+      // Device events
       device.on('registered', () => {
         console.log('[TwilioContext] Device registered');
-        diag('device.registered', '');
-      });
-      device.on('unregistered', () => {
-        console.log('[TwilioContext] Device unregistered');
+        diag('device.registered');
         setConnectionStatus('registered');
-      });
-      device.on('error', (e: any) => {
-        console.error('[TwilioContext] Device error:', e);
-        diag('device.error', `${e?.name || ''}: ${e?.message || 'unknown'}`);
+        setError(null);
       });
 
-      device.audio?.on('deviceChange', () => {
-        console.log('[TwilioContext] Audio device changed');
+      device.on('error', (err: any) => {
+        console.error('[TwilioContext] Device error:', err);
+        diag('device.error', `${err?.name || ''}: ${err?.message || 'unknown'}${err?.causedBy ? ` causedBy=${err.causedBy}` : ''}`);
+        setError(`Twilio error: ${err?.message || 'Unknown error'}`);
       });
 
-      console.log('[TwilioContext] Registering device...');
+      device.on('incoming', (call: Call) => {
+        console.log('[TwilioContext] Incoming call:', call.parameters);
+        incomingCallRef.current = call;
+        setIncomingCall(call);
+        setIncomingCallerNumber(call.parameters?.From || 'Unknown');
+        setIncomingCallerName(call.parameters?.FromCity || '');
+
+        // Listen for cancel/reject on incoming call
+        call.on('cancel', () => {
+          incomingCallRef.current = null;
+          setIncomingCall(null);
+          setIncomingCallerNumber('');
+          setIncomingCallerName('');
+        });
+
+        call.on('reject', () => {
+          incomingCallRef.current = null;
+          setIncomingCall(null);
+          setIncomingCallerNumber('');
+          setIncomingCallerName('');
+        });
+      });
+
+      device.on('tokenWillExpire', async () => {
+        console.log('[TwilioContext] Token expiring, refreshing...');
+        try {
+          const refreshRes = await twilioApi.getToken();
+          if (refreshRes.data?.token) {
+            device.updateToken(refreshRes.data.token);
+          }
+        } catch (err) {
+          console.error('[TwilioContext] Failed to refresh token:', err);
+        }
+      });
+
       await device.register();
       deviceRef.current = device;
       (window as any).__scDevice = device;
       (window as any).__scDeviceTag = (Device as any).__scModuleTag;
 
-      setConnectionStatus('registered');
       console.log('[TwilioContext] Device connected and registered');
-      diag('device.register.done', '');
-    } catch (err: any) {
-      console.error('[TwilioContext] Failed to initialize Twilio:', err);
-      diag('device.register.failed', String(err?.message || err).slice(0, 300));
+      diag('device.register.done');
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to initialize Twilio';
+      try {
+        fetch('/api/diag/event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: 'device.register.fail', detail: message.slice(0, 400) }),
+        }).catch(() => {});
+      } catch { /* noop */ }
+      setError(message);
       setConnectionStatus('disconnected');
-      setError(`Twilio connection failed: ${err?.message || 'Unknown error'}`);
+      console.error('[TwilioContext] Init error:', err);
     }
   }, []);
 
   const disconnect = useCallback(() => {
+    stopPrimaryTimer();
     if (deviceRef.current) {
       try { deviceRef.current.destroy(); } catch { /* noop */ }
       deviceRef.current = null;
     }
     setConnectionStatus('disconnected');
-  }, []);
+    setPrimaryCallState('idle');
+    setPrimaryCall(null);
+    primaryCallRef.current = null;
+    setIncomingCall(null);
+    incomingCallRef.current = null;
+    setHeldCall(null);
+    setSipError(null);
+    setIsMuted(false);
+    setIsHeld(false);
+  }, [stopPrimaryTimer]);
 
+  // ── Call actions ───────────────────────────────────────────────────
   const dial = useCallback(
     async (destinationNumber: string, callerNumber?: string) => {
       // Prefer the live device handle: React StrictMode double-mounts providers,
@@ -480,13 +536,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       }).catch((err: any) => {
         connectSettled = true;
         clearTimeout(connectTimer);
-        console.error('[TwilioContext] device.connect() rejected:', err);
+        console.error('[TwilioContext] Connect failed:', err);
         diag('device.connect.rejected', String(err?.message || err).slice(0, 300));
+        setError(`Failed to dial: ${err?.message || 'Unknown error'}`);
         setPrimaryCallState('idle');
-        setError(`Dial failed: ${err?.message || 'Unknown error'}`);
       });
     },
-    [connectionStatus, attachCallListeners, authUser]
+    [connectionStatus, attachCallListeners]
   );
 
   const hangup = useCallback(() => {
