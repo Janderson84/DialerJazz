@@ -18,6 +18,7 @@ export const MASTER_ID = () =>
 const TWILIO_FIELDS = [
   'twilio_account_sid',
   'twilio_auth_token',
+  'twilio_caller_number',
   'twilio_api_key',
   'twilio_api_secret',
   'twilio_twiml_app_sid',
