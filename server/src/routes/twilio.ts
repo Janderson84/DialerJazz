@@ -58,7 +58,7 @@ router.post('/token', requireAuth, async (req: AuthenticatedRequest, res, next) 
 // Unauthenticated TwiML webhook. Twilio calls this when a browser
 // client initiates an outbound call via device.connect().
 // Returns TwiML XML instructing Twilio how to route the call.
-router.post('/voice', express.urlencoded({ extended: false }), (req: Request, res: Response) => {
+router.post('/voice', express.urlencoded({ extended: false }), async (req: Request, res: Response) => {
   try {
     const twiml = new twilio.twiml.VoiceResponse();
     const to = req.body.To;
@@ -73,6 +73,39 @@ router.post('/voice', express.urlencoded({ extended: false }), (req: Request, re
       twiml.say('Caller ID not configured. Please set a verified phone number in your connector settings.');
       res.type('text/xml').send(twiml.toString());
       return;
+    }
+
+    // Safety: if an inbound call to one of OUR lines ever lands on the outbound
+    // route (webhook misconfiguration), do NOT out-dial — that loops (we would
+    // dial ourselves). Hand it to inbound routing for the master instead.
+    if (to && req.query.rep === undefined) {
+      const cleanTo = to.replace(/[^\d+]/g, '');
+      const masterSettings2 = await getMasterTwilioSettings().catch(() => null);
+      const ourLines = new Set<string>();
+      if (masterSettings2?.twilio_caller_number) ourLines.add(String(masterSettings2.twilio_caller_number).replace(/[^\d+]/g, ''));
+      // Rep numbers from team_members (admin fetch, best effort)
+      try {
+        const base = process.env.INFORGE_URL || process.env.INSFORGE_URL || 'http://localhost:7130';
+        const username = process.env.INSFORGE_ADMIN_USER || 'admin';
+        const password = process.env.INSFORGE_ADMIN_PASSWORD;
+        if (password) {
+          const s = await fetch(`${base}/api/auth/admin/sessions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }) });
+          if (s.ok) {
+            const { accessToken } = await s.json();
+            const rows = await fetch(`${base}/api/database/records/team_members?select=phone_number`, { headers: { Authorization: `Bearer ${accessToken}`, apikey: accessToken } }).then(r => r.json());
+            for (const r of (Array.isArray(rows) ? rows : rows?.data || [])) {
+              if (r?.phone_number) ourLines.add(String(r.phone_number).replace(/[^\d+]/g, ''));
+            }
+          }
+        }
+      } catch { /* best effort */ }
+      if (ourLines.has(cleanTo)) {
+        const inboundTwiML = new twilio.twiml.VoiceResponse();
+        const dialIn = inboundTwiML.dial({ callerId: from, timeout: 25 });
+        dialIn.client(`user_${MASTER_ID()}`);
+        res.type('text/xml').send(inboundTwiML.toString());
+        return;
+      }
     }
 
     if (to && /^[\d+\-() ]+$/.test(to)) {
