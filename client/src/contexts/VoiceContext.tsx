@@ -140,7 +140,12 @@ export function VoiceContextProvider({ children }: { children: ReactNode }) {
     // Actions (delegated to active)
     connectProvider,
     disconnectProvider,
-    dial: active.dial,
+    dial: (destination: string, callerNumber?: string) => {
+      try {
+        fetch('/api/diag/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'voice.dial', detail: 'provider=' + activeProvider + ' to=' + destination }) }).catch(() => {});
+      } catch { /* noop */ }
+      return active.dial(destination, callerNumber);
+    },
     hangup: active.hangup,
     answerIncoming: active.answerIncoming,
     rejectIncoming: active.rejectIncoming,
