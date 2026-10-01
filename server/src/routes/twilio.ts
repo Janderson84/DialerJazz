@@ -32,7 +32,7 @@ router.post('/token', requireAuth, async (req: AuthenticatedRequest, res, next) 
       throw new ApiError(400, 'TwiML App SID not configured. Go to Connectors page.', 'config_missing');
     }
 
-    console.log('[twilio/token] Generating token for user:', userId);
+    console.log(`[${new Date().toISOString()}] [twilio/token] Generating token for user: ${userId}`);
 
     const token = new AccessToken(
       settings.twilio_account_sid,
@@ -64,7 +64,7 @@ router.post('/voice', express.urlencoded({ extended: false }), (req: Request, re
     const to = req.body.To;
     const from = req.body.From || req.body.Caller;
 
-    console.log(`[Twilio Voice Webhook] To=${to}, From=${from}`);
+    console.log(`[${new Date().toISOString()}] [Twilio Voice Webhook] To=${to}, From=${from}, CallSid=${req.body.CallSid}`);
 
     // Validate callerId - Twilio requires a verified phone number for outbound calls
     // The client already validates this before calling device.connect() (TwilioContext line 313)
