@@ -88,7 +88,7 @@ const strictLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: { code: 'rate_limited', message: 'Too many requests. Please try again later.' } },
+  message: { error: { code: 'rate_limited', message: 'Too many requests for this endpoint.' } },
 });
 
 app.use('/api', apiLimiter);
