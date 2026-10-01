@@ -19,6 +19,7 @@ import twilioRouter from './routes/twilio.js';
 import teamRouter from './routes/team.js';
 import voicemailRouter from './routes/voicemail.js';
 import pipedriveRouter from './routes/pipedrive.js';
+import diagRouter from './routes/diag.js';
 
 // In dev, load .env from parent dir. In production (Docker), env vars are injected.
 if (process.env.NODE_ENV !== 'production') {
@@ -87,7 +88,7 @@ const strictLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: { code: 'rate_limited', message: 'Too many requests for this endpoint.' } },
+  message: { error: { code: 'rate_limited', message: 'Too many requests. Please try again later.' } },
 });
 
 app.use('/api', apiLimiter);
@@ -105,6 +106,7 @@ app.use('/api/twilio', twilioRouter);
 app.use('/api/team', teamRouter);
 app.use('/api/voicemail', voicemailRouter);
 app.use('/api/pipedrive', pipedriveRouter);
+app.use('/api/diag', diagRouter);
 
 // ─── Production: Serve Vite client as static files ─────────
 if (process.env.NODE_ENV === 'production') {
