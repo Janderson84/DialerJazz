@@ -21,7 +21,7 @@ import {
 } from 'react';
 import { TelnyxRTC, Call, SwEvent } from '@telnyx/webrtc';
 import type { INotification } from '@telnyx/webrtc';
-import { settingsApi, telnyxApi } from '@/lib/api';
+import { settingsApi, telnyxApi, callsApi } from '@/lib/api';
 
 // ── Utilities ────────────────────────────────────────────────────────
 function toE164(number: string): string {
@@ -69,7 +69,7 @@ export interface TelnyxContextValue {
   heldCallerNumber: string;
 
   // Actions
-  dial: (destinationNumber: string, callerNumber?: string) => void;
+  dial: (destinationNumber: string, callerNumber?: string, opts?: { autoLog?: boolean }) => void;
   hangup: () => void;
   answerIncoming: () => void;
   rejectIncoming: () => void;
@@ -144,7 +144,11 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
     if (primaryTimerRef.current) clearInterval(primaryTimerRef.current);
     setPrimaryCallDuration(0);
     primaryTimerRef.current = setInterval(() => {
-      setPrimaryCallDuration((prev) => prev + 1);
+    primaryDurationRef.current = 0;
+      setPrimaryCallDuration((prev) => {
+        primaryDurationRef.current = prev + 1;
+        return prev + 1;
+      });
     }, 1000);
   }, []);
 
@@ -457,25 +461,32 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
 
   // ── Call actions ───────────────────────────────────────────────────
   const dial = useCallback(
-    (destinationNumber: string, callerNumber?: string) => {
+    (destinationNumber: string, callerNumber?: string, opts?: { autoLog?: boolean }) => {
       const client = clientRef.current;
       if (!client) { setError('Telnyx client not initialized.'); return; }
       if (connectionStatus !== 'registered') { setError('Telnyx not registered yet.'); return; }
       if (primaryCallRef.current) { setError('A call is already in progress.'); return; }
 
       const resolvedCallerNumber = callerNumber || callerNumberRef.current || '';
-      
+
       if (!resolvedCallerNumber) {
         console.warn('[TelnyxContext] ⚠️ No callerNumber configured! Telnyx may route using default behaviors.', { callerNumber, callerNumberRef: callerNumberRef.current });
       }
 
       const formattedCallerNumber = toE164(resolvedCallerNumber);
 
-      console.log('[TelnyxContext] dial():', { 
-        destinationNumber, 
+      console.log('[TelnyxContext] dial():', {
+        destinationNumber,
         rawCallerNumber: resolvedCallerNumber,
-        formattedCallerNumber 
+        formattedCallerNumber
       });
+
+      // Call metadata for auto-logging on call end (unless the caller logs
+      // itself, e.g. CampaignDialerPage which logs with lead_id).
+      callMetaRef.current = opts?.autoLog === false
+        ? null
+        : { direction: 'outbound', to_number: destinationNumber };
+      primaryDurationRef.current = 0;
 
       setError(null);
       setSipError(null);
@@ -484,7 +495,6 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
       setIsMuted(false);
       setIsHeld(false);
       setPrimaryCallDuration(0);
-
       client.newCall({
         destinationNumber,
         callerNumber: formattedCallerNumber,
@@ -501,6 +511,10 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
         hungUpCallIdsRef.current.add(primaryCallRef.current.id);
       }
       primaryCallRef.current.hangup();
+    } else {
+      // No call object → no terminal notification will fire; drop stale meta
+      // so it can't leak into the next call's auto-log.
+      callMetaRef.current = null;
     }
     stopPrimaryTimer();
     setPrimaryCallState('done');
@@ -668,3 +682,39 @@ export function useTelnyxContext(): TelnyxContextValue {
   }
   return ctx;
 }
+  // Mirrored duration for use inside the notification handler (state reads go stale there)
+  const primaryDurationRef = useRef(0);
+  // Metadata of the current/last call for auto-logging on end. dial() sets
+  // direction 'outbound'; answering an incoming call sets 'inbound'.
+  // CampaignDialerPage passes { autoLog: false } and logs its own lead-aware call.
+  const callMetaRef = useRef<{ direction: 'outbound' | 'inbound'; to_number?: string; from_number?: string } | null>(null);
+  // Ref mirror of incomingCallerNumber — state reads inside callbacks go stale.
+  const incomingCallerNumberRef = useRef('');
+          incomingCallerNumberRef.current = call.options?.callerNumber || call.options?.remoteCallerNumber || 'Unknown';
+          callMetaRef.current = {
+            direction: 'inbound',
+            from_number: incomingCallerNumberRef.current || call.options?.callerNumber || '',
+          };
+          primaryDurationRef.current = 0;
+
+        // Auto-log leadless calls (manual dialer / inbound) — parity with
+        // TwilioContext. Campaign calls log themselves with lead_id.
+        const meta = callMetaRef.current;
+        callMetaRef.current = null;
+        const duration = primaryDurationRef.current;
+        if (meta && duration > 0) {
+          const payload = {
+            lead_id: null,
+            campaign_id: null,
+            duration_seconds: duration,
+            status: 'completed',
+            disposition: meta.direction === 'inbound' ? 'inbound_call' : 'manual_call',
+            notes: meta.direction === 'inbound' ? 'Inbound call' : 'Manual out-of-band call',
+            provider: 'telnyx' as const,
+            direction: meta.direction,
+            to_number: meta.to_number || null,
+            from_number: meta.from_number || null,
+          };
+          console.log('[TelnyxContext] Auto-logging call:', payload);
+          callsApi.log(payload).catch((err) => console.error('[TelnyxContext] Auto-log failed:', err));
+        }

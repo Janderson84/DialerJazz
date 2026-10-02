@@ -278,8 +278,8 @@ export interface CallStats {
 }
 
 export const callsApi = {
-  log: (payload: { lead_id: string | null; campaign_id: string | null; duration_seconds: number; status: string; disposition: string; notes?: string; provider?: string }) =>
-    apiFetch<{ data: unknown }>('/calls/log', {
+  log: (payload: { lead_id: string | null; campaign_id: string | null; duration_seconds: number; status: string; disposition: string; notes?: string; provider?: string; direction?: 'outbound' | 'inbound'; to_number?: string | null; from_number?: string | null }) =>
+    apiFetch<{ data: unknown; pipedrive?: unknown }>('/calls/log', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

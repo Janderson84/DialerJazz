@@ -171,7 +171,9 @@ export default function CampaignDialerPage() {
 
     if (!voice.sipConfigured) return toast.error('Configure a telephony provider in Connectors first.');
     if (voice.connectionStatus !== 'registered') return toast.error('Connecting...');
-    voice.dial(lead.phone);
+    // autoLog:false — this page logs the call itself with lead_id (attempt
+    // counter); the context-level auto-log would double-log the call.
+    voice.dial(lead.phone, undefined, { autoLog: false });
   };
 
   const handleDial = () => handleDialForLead(currentLead);

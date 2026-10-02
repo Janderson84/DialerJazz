@@ -18,19 +18,18 @@ const router = Router();
 const PD_BASE = 'https://api.pipedrive.com/api/v1';
 
 // ── token helper ────────────────────────────────────────────────────
-async function getPipedriveToken(req?: AuthenticatedRequest): Promise<string> {
+export async function getPipedriveToken(req?: AuthenticatedRequest): Promise<string> {
   // 1. master's own settings
   const masterToken = await getMasterSettingsField('pipedrive_api_key');
   if (masterToken) return masterToken;
   throw new ApiError(400, 'Pipedrive not connected. Ask James to add the API token in Connectors.', 'pd_no_token');
 }
 
-/** Pipedrive GET with api_token param. */
+/** Pipedrive GET with the token in the Authorization header (keeps it out of URL query / access logs). */
 async function pdGet(token: string, path: string, params: Record<string, string | number> = {}): Promise<any> {
   const url = new URL(`${PD_BASE}${path}`);
-  url.searchParams.set('api_token', token);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
     throw new ApiError(502, `Pipedrive API error (${res.status}): ${txt.slice(0, 200)}`, 'pd_api_error');
@@ -40,11 +39,11 @@ async function pdGet(token: string, path: string, params: Record<string, string 
   return json.data;
 }
 
-/** Pipedrive POST/PUT. */
+/** Pipedrive POST/PUT with the token in the Authorization header. */
 async function pdPost(token: string, path: string, body: Record<string, unknown>, method = 'POST'): Promise<any> {
-  const res = await fetch(`${PD_BASE}${path}?api_token=${encodeURIComponent(token)}`, {
+  const res = await fetch(`${PD_BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -197,7 +196,7 @@ router.get('/users', requireAuth, async (req: AuthenticatedRequest, res: Respons
  * Cached mapping lives in team_members.pd_user_id; falls back to
  * best-effort email match against the Pipedrive users list.
  */
-async function resolvePdUserId(req: AuthenticatedRequest, token: string): Promise<number | null> {
+export async function resolvePdUserId(req: AuthenticatedRequest, token: string): Promise<number | null> {
   const client = getInsforgeClient(req.user!.token);
   const dialerEmail = req.user!.email?.toLowerCase();
 
@@ -224,6 +223,121 @@ async function resolvePdUserId(req: AuthenticatedRequest, token: string): Promis
   return null;
 }
 
+// ── shared call-activity helper ─────────────────────────────────────
+/**
+ * Push a call outcome to Pipedrive as a done activity.
+ * Used by POST /log-call (campaign path, deal pre-known) and by
+ * calls.ts /log (manual/inbound path, deal resolved from the phone number).
+ */
+export async function pushPdCallActivity(
+  token: string,
+  opts: {
+    deal_id?: number | null;
+    person_id?: number | null;
+    direction: 'outbound' | 'inbound';
+    disposition: string;
+    duration_secs: number;
+    notes?: string;
+    rep_name?: string;
+    rep_email?: string;
+    duplicates?: number[];
+    pd_user_id?: number | null;
+  }
+): Promise<{ activity_id: number | null }> {
+  const when = new Date().toISOString().slice(0, 16).replace('T', ' ');
+  const note = [
+    `Cold Call Machine: ${opts.disposition}${opts.direction === 'inbound' ? ' (inbound)' : ''}`,
+    opts.duration_secs ? `Duration: ${Math.floor(opts.duration_secs / 60)}m ${opts.duration_secs % 60}s` : '',
+    opts.deal_id && opts.duplicates?.length ? `Other open deals: ${opts.duplicates.join(', ')}` : '',
+    opts.notes ? `Notes: ${opts.notes}` : '',
+    opts.rep_name ? `Rep: ${opts.rep_name}` : '',
+    opts.rep_email ? `Logged for: ${opts.rep_email}` : '',
+  ].filter(Boolean).join('\n');
+
+  const activity = await pdPost(token, '/activities', {
+    ...(opts.deal_id ? { deal_id: opts.deal_id } : {}),
+    ...(opts.person_id ? { person_id: opts.person_id } : {}),
+    subject: `Call (${opts.disposition}) — ${when} UTC`,
+    type: 'call',
+    note,
+    done: 1,
+    // Per-rep attribution: activity shows as the rep's Pipedrive user
+    ...(opts.pd_user_id ? { user_id: opts.pd_user_id } : {}),
+  });
+  return { activity_id: activity?.id ?? null };
+}
+
+/** Normalize a phone to digits with optional leading + (compare on last 10 digits). */
+function normalizeDigits(phone: string): string {
+  const d = phone.replace(/[^\d+]/g, '');
+  return d.startsWith('+') ? d : `+${d}`;
+}
+function last10(phone: string): string {
+  const d = phone.replace(/\D/g, '');
+  return d.length > 10 ? d.slice(-10) : d;
+}
+
+// ── phone → Pipedrive person/deal resolver ─────────────────────────
+/**
+ * Resolve a phone number to a Pipedrive person and the open deal to log
+ * against. Person via /persons/find (phone search); deal = the most recently
+ * updated open deal on that person (others returned as duplicates).
+ */
+export async function resolvePdByPhone(
+  token: string,
+  phone: string
+): Promise<
+  | { matched: true; person_id: number; person_name: string; deal_id: number | null; deal_title: string | null; duplicates: number[] }
+  | { matched: false }
+> {
+  if (!phone || !phone.replace(/\D/g, '')) return { matched: false };
+
+  // 1. Find the person by phone
+  let person: any = null;
+  try {
+    const found = await pdGet(token, '/persons/find', { term: phone, search_by_phone: 1, limit: 1 });
+    person = Array.isArray(found) ? found[0] : found?.items?.[0]?.item || found?.[0] || null;
+  } catch {
+    person = null;
+  }
+  if (!person?.id) {
+    // Cheap fallback: scan the first 100 persons and compare digits.
+    // When both sides are E.164 (leading +), require an EXACT match — a
+    // last-10-digits match on international numbers can hit the wrong person.
+    try {
+      const all = await pdGet(token, '/persons', { limit: 100 });
+      const digits = last10(phone);
+      const isE164 = phone.startsWith('+');
+      person = (all as any[]).find((p) =>
+        (p.phone || []).some((ph: any) => {
+          const v = ph?.value || '';
+          if (isE164 && v.replace(/\s/g, '').startsWith('+')) return v.replace(/[^\d+]/g, '') === phone;
+          return last10(v) === digits;
+        })
+      ) || null;
+    } catch {
+      return { matched: false };
+    }
+  }
+  if (!person?.id) return { matched: false };
+
+  // 2. Open deals on the person — log against the most recently updated one
+  let dealId: number | null = null;
+  let dealTitle: string | null = null;
+  let duplicates: number[] = [];
+  try {
+    const deals = (await pdGet(token, '/deals', { person_id: person.id, status: 'open', limit: 50 })) as any[];
+    if (deals.length) {
+      const sorted = [...deals].sort((a, b) => String(b.update_time || '').localeCompare(String(a.update_time || '')));
+      dealId = sorted[0].id;
+      dealTitle = sorted[0].title || null;
+      duplicates = sorted.slice(1).map((d) => d.id);
+    }
+  } catch { /* deal lookup failed — still log on the person */ }
+
+  return { matched: true, person_id: person.id, person_name: person.name || '', deal_id: dealId, deal_title: dealTitle, duplicates };
+}
+
 // ── POST /api/pipedrive/log-call — push a call outcome to Pipedrive ──
 // body: { pipedrive_deal_id, disposition, duration_secs, notes?, rep_name? }
 router.post('/log-call', requireAuth, async (req: AuthenticatedRequest, res: Response, next) => {
@@ -235,27 +349,19 @@ router.post('/log-call', requireAuth, async (req: AuthenticatedRequest, res: Res
     if (!dealId) throw new ApiError(400, 'pipedrive_deal_id required', 'bad_input');
     const token = await getPipedriveToken(req);
 
-    const subject = `Call (${disposition}) — ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC`;
-    const note = [
-      `Cold Call Machine: ${disposition}`,
-      duration ? `Duration: ${Math.floor(duration / 60)}m ${duration % 60}s` : '',
-      notes ? `Notes: ${notes}` : '',
-      req.body?.rep_name ? `Rep: ${req.body.rep_name}` : '',
-      req.user?.email ? `Logged for: ${req.user.email}` : '',
-    ].filter(Boolean).join('\n');
-
-    // Attribute the activity to the actual rep (falls back to the master/token owner)
     const pdUserId = await resolvePdUserId(req, token);
-    const activity = await pdPost(token, '/activities', {
+    const result = await pushPdCallActivity(token, {
       deal_id: dealId,
-      subject,
-      type: 'call',
-      note,
-      done: 1,
-      ...(pdUserId ? { user_id: pdUserId } : {}),
+      direction: 'outbound',
+      disposition,
+      duration_secs: duration,
+      notes,
+      rep_name: req.body?.rep_name,
+      rep_email: req.user?.email,
+      pd_user_id: pdUserId,
     });
 
-    res.json({ data: { activity_id: activity?.id } });
+    res.json({ data: result });
   } catch (err) { next(err); }
 });
 

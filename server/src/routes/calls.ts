@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import { getPipedriveToken, resolvePdByPhone, pushPdCallActivity, resolvePdUserId } from './pipedrive.js';
 
 const router = Router();
 
@@ -13,7 +14,10 @@ const callLogSchema = z.object({
   status: z.string().min(1).max(50).default('completed'),
   disposition: z.string().min(1).max(50).optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
-  provider: z.enum(['telnyx', 'twilio', 'local']).default('twilio'),
+  provider: z.enum(['telnyx', 'twilio', 'local']).default('telnyx'),
+  direction: z.enum(['outbound', 'inbound']).default('outbound'),
+  to_number: z.string().max(40).optional().nullable(),
+  from_number: z.string().max(40).optional().nullable(),
 });
 
 // POST /api/calls/log
@@ -37,11 +41,13 @@ router.post('/log', requireAuth, async (req: AuthenticatedRequest, res, next) =>
         lead_id: validated.lead_id,
         campaign_id: validated.campaign_id || null,
         provider: validated.provider,
-        direction: 'outbound',
         duration_seconds: validated.duration_seconds,
         status: validated.status,
         disposition: validated.disposition || null,
         notes: validated.notes || null,
+        direction: validated.direction,
+        to_number: validated.to_number || null,
+        from_number: validated.from_number || null,
         started_at: new Date().toISOString(),
         ended_at: new Date().toISOString(),
       })
@@ -54,6 +60,48 @@ router.post('/log', requireAuth, async (req: AuthenticatedRequest, res, next) =>
     }
 
     console.log('[calls/log] Inserted log:', logData);
+
+    // ── Pipedrive push (manual / inbound path only — best-effort, non-fatal).
+    // Campaign calls (lead_id set) are pushed via POST /api/pipedrive/log-call
+    // with the deal id known; here we resolve phone → person/deal server-side.
+    // Never blocks or fails the call log: no token / no match / PD error all
+    // return 200 with a `pipedrive` status field.
+    let pdResult: unknown = null;
+    if (!validated.lead_id && (validated.to_number || validated.from_number)) {
+      try {
+        const phone = validated.direction === 'inbound'
+          ? (validated.from_number || '')
+          : (validated.to_number || '');
+        // Skip obvious non-customer numbers (browser clients, etc.)
+        if (!/\d{7,}/.test(phone.replace(/\D/g, ''))) {
+          pdResult = { matched: false };
+        } else {
+          const token = await getPipedriveToken(req);
+          const pdUserId = await resolvePdUserId(req, token);
+          const match = await resolvePdByPhone(token, phone);
+          if (match.matched) {
+            pdResult = await pushPdCallActivity(token, {
+              deal_id: match.deal_id,
+              person_id: match.person_id,
+              direction: validated.direction,
+              disposition: validated.disposition || 'call',
+              duration_secs: validated.duration_seconds,
+              notes: validated.notes || undefined,
+              rep_name: req.user?.name,
+              rep_email: req.user?.email,
+              pd_user_id: pdUserId,
+              duplicates: match.duplicates,
+            });
+            pdResult = { ...(pdResult as any), person_name: match.person_name, deal_title: match.deal_title };
+          } else {
+            pdResult = { matched: false };
+          }
+        }
+      } catch (e: any) {
+        console.warn('[calls/log] Pipedrive push skipped:', e?.message || e);
+        pdResult = { skipped: true };
+      }
+    }
 
     // Step 1: Check if this lead was previously uncalled (status is 'new' or 'calling')
     if (validated.lead_id && validated.campaign_id && validated.disposition) {
@@ -98,7 +146,7 @@ router.post('/log', requireAuth, async (req: AuthenticatedRequest, res, next) =>
       }
     }
 
-    res.status(200).json({ data: logData });
+    res.status(200).json({ data: logData, pipedrive: pdResult });
   } catch (err) {
     next(err);
   }
