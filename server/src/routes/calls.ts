@@ -13,7 +13,7 @@ const callLogSchema = z.object({
   status: z.string().min(1).max(50).default('completed'),
   disposition: z.string().min(1).max(50).optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
-  provider: z.enum(['telnyx', 'twilio', 'local']).default('telnyx'),
+  provider: z.enum(['telnyx', 'twilio', 'local']).default('twilio'),
 });
 
 // POST /api/calls/log

@@ -9,7 +9,7 @@ router.use(requireAuth);
 const createCampaignSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name must be under 100 characters'),
   dialer_mode: z.enum(['preview', 'power', 'predictive', 'click']).default('preview'),
-  provider: z.enum(['telnyx', 'twilio', 'local']).default('telnyx'),
+  provider: z.enum(['telnyx', 'twilio', 'local']).default('twilio'),
   caller_number: z.string().optional(),
 });
 

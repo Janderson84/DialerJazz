@@ -16,7 +16,7 @@ export default function CampaignManagePage() {
 
   // Editable config state
   const [dialerMode, setDialerMode] = useState<string>('click');
-  const [provider, setProvider] = useState<'telnyx' | 'twilio' | 'local'>('telnyx');
+  const [provider, setProvider] = useState<'telnyx' | 'twilio' | 'local'>('twilio');
   const [callerNumber, setCallerNumber] = useState<string>('');
 
   const [telnyxNumbers, setTelnyxNumbers] = useState<{ phone_number: string; friendly_name: string }[]>([]);
@@ -37,7 +37,7 @@ export default function CampaignManagePage() {
         setSettings(settingsRes.data);
 
         setDialerMode(camp.dialer_mode || 'click');
-        setProvider(camp.provider || 'telnyx');
+        setProvider(camp.provider || 'twilio');
         setCallerNumber(camp.caller_number || '');
 
         if (tnNumRes.data) setTelnyxNumbers(tnNumRes.data as any);

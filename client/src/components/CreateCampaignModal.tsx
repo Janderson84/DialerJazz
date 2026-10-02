@@ -110,7 +110,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onCreated }: Prop
   // Details State
   const [name, setName] = useState('');
   const [dialerMode, setDialerMode] = useState('preview');
-  const [provider, setProvider] = useState<'telnyx' | 'twilio' | 'local'>('telnyx');
+  const [provider, setProvider] = useState<'telnyx' | 'twilio' | 'local'>('twilio');
   const [callerNumber, setCallerNumber] = useState('');
 
   // CRM Import State
@@ -138,7 +138,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onCreated }: Prop
       setStep('details');
       setName('');
       setDialerMode('preview');
-      setProvider('telnyx');
+      setProvider('twilio');
       setCallerNumber('');
       setSelectedLeadIds(new Set());
       setCsvFile(null);

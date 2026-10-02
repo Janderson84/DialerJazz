@@ -11,7 +11,7 @@ export default function SettingsPage() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [defaultProvider, setDefaultProvider] = useState<'telnyx' | 'twilio'>('telnyx');
+  const [defaultProvider, setDefaultProvider] = useState<'telnyx' | 'twilio'>('twilio');
 
   useEffect(() => {
     setMounted(true);
@@ -22,7 +22,7 @@ export default function SettingsPage() {
     try {
       const response = await settingsApi.get();
       if (response.data) {
-        setDefaultProvider(response.data.default_provider || 'telnyx');
+        setDefaultProvider(response.data.default_provider || 'twilio');
       }
     } catch (error) {
       console.error('Failed to load settings', error);

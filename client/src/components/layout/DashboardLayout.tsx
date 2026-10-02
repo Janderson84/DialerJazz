@@ -28,11 +28,11 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         try {
           const { data } = await settingsApi.get();
           if (mounted) {
-             const defaultProv = data?.default_provider || 'telnyx';
+             const defaultProv = data?.default_provider || 'twilio';
              connectProvider(defaultProv);
           }
         } catch (e) {
-          if (mounted) connectProvider('telnyx'); // fallback
+          if (mounted) connectProvider('twilio'); // fallback
         }
       }
     }

@@ -195,7 +195,7 @@ export default function CampaignDialerPage() {
         status: 'completed',
         disposition: dispValue,
         notes: notes,
-        provider: campaign?.provider || 'telnyx',
+        provider: campaign?.provider || 'twilio',
       });
       
       // Update lead status so it won't appear on refresh

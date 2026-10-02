@@ -130,7 +130,7 @@ describe('POST /api/calls/log', () => {
         user_id: 'user-id-123',
         lead_id: validLeadId,
         duration_seconds: 60,
-        provider: 'telnyx',
+        provider: 'twilio',
         direction: 'outbound',
         disposition: 'hot_lead',
         status: 'completed',
