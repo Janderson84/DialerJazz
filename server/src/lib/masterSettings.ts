@@ -22,7 +22,6 @@ const TWILIO_FIELDS = [
   'twilio_api_key',
   'twilio_api_secret',
   'twilio_twiml_app_sid',
-  'twilio_caller_number',
 ] as const;
 
 /** Fetch the master's Twilio settings using the admin API (bypasses RLS). */
