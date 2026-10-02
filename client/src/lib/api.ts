@@ -370,3 +370,91 @@ export const twilioApi = {
       method: 'POST',
     }),
 };
+
+// ============ SMS API ============
+
+export interface SmsTemplate {
+  id: string;
+  name: string;
+  body: string;
+  updated_at?: string;
+}
+
+export interface SmsMessage {
+  id: string;
+  direction: 'outbound' | 'inbound';
+  from_number: string;
+  to_number: string;
+  body: string;
+  status: string;
+  lead_id?: string | null;
+  conversation_status: 'open' | 'closed';
+  scheduled_for?: string | null;
+  created_at: string;
+}
+
+export interface SmsAutoReply {
+  id: string;
+  name: string;
+  trigger_event: 'inbound_text' | 'missed_call' | 'voicemail';
+  body: string;
+  active: boolean;
+  schedule_mode: 'always' | 'business_hours' | 'after_hours';
+  business_hours?: { start: string; end: string; tz?: string };
+}
+
+export const smsApi = {
+  listTemplates: () =>
+    apiFetch<SmsTemplate[]>('/sms/templates'),
+
+  createTemplate: (name: string, body: string) =>
+    apiFetch<SmsTemplate>('/sms/templates', {
+      method: 'POST',
+      body: JSON.stringify({ name, body }),
+    }),
+
+  updateTemplate: (id: string, patch: { name?: string; body?: string }) =>
+    apiFetch(`/sms/templates/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+
+  deleteTemplate: (id: string) =>
+    apiFetch(`/sms/templates/${id}`, { method: 'DELETE' }),
+
+  send: (payload: { to: string; body: string; lead_id?: string | null; template_id?: string; scheduled_for?: string }) =>
+    apiFetch<{ sent?: boolean; scheduled?: boolean }>('/sms/send', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  listThreads: () =>
+    apiFetch<SmsMessage[]>('/sms/threads'),
+
+  getThread: (peer: string) =>
+    apiFetch<SmsMessage[]>(`/sms/threads/${encodeURIComponent(peer)}`),
+
+  setThreadStatus: (peer: string, status: 'open' | 'closed') =>
+    apiFetch(`/sms/threads/${encodeURIComponent(peer)}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+
+  listAutoReplies: () =>
+    apiFetch<SmsAutoReply[]>('/sms/auto-replies'),
+
+  createAutoReply: (payload: Pick<SmsAutoReply, 'name' | 'trigger_event' | 'body'> & Partial<SmsAutoReply>) =>
+    apiFetch<SmsAutoReply>('/sms/auto-replies', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  updateAutoReply: (id: string, patch: Partial<SmsAutoReply>) =>
+    apiFetch(`/sms/auto-replies/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+
+  deleteAutoReply: (id: string) =>
+    apiFetch(`/sms/auto-replies/${id}`, { method: 'DELETE' }),
+};

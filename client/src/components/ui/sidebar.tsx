@@ -13,6 +13,7 @@ import {
   Headphones,
   HelpCircle,
   UserCog,
+  MessageSquare,
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { useState } from "react";
@@ -166,6 +167,15 @@ export function SessionNavBar({ isCollapsed, onToggle }: SessionNavBarProps) {
                   >
                     Dialer
                   </NavItem>
+                  <NavItem
+                    href="/messages"
+                    icon={MessageSquare}
+                    active={pathname?.includes("messages")}
+                    collapsed={isCollapsed}
+                    onNavigate={handleNavigation}
+                  >
+                    Messages
+                  </NavItem>
                 </div>
               </div>
 
@@ -267,6 +277,7 @@ export function SessionNavBar({ isCollapsed, onToggle }: SessionNavBarProps) {
                   <NavItem href="/dashboard" icon={LayoutDashboard} active={pathname === "/dashboard" || pathname === "/"} onNavigate={handleNavigation}>Dashboard</NavItem>
                   <NavItem href="/campaigns" icon={PhoneCall} active={pathname?.includes("campaigns")} onNavigate={handleNavigation}>Campaigns</NavItem>
                   <NavItem href="/dialer" icon={Headphones} active={pathname?.includes("dialer")} onNavigate={handleNavigation}>Dialer</NavItem>
+                  <NavItem href="/messages" icon={MessageSquare} active={pathname?.includes("messages")} onNavigate={handleNavigation}>Messages</NavItem>
                 </div>
               </div>
               <div>

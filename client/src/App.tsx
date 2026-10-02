@@ -16,6 +16,7 @@ import CampaignManagePage from './pages/CampaignManagePage';
 import ManualDialerPage from './pages/ManualDialerPage';
 import CallLogsPage from './pages/CallLogsPage';
 import TeamPage from './pages/TeamPage';
+import MessagesPage from './pages/MessagesPage';
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, isLoading } = useAuth();
@@ -90,6 +91,7 @@ function App() {
           <Route path="/dialer" element={<ManualDialerPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/team" element={<TeamPage />} />
+          <Route path="/messages" element={<MessagesPage />} />
         </Route>
       </Routes>
     </div>

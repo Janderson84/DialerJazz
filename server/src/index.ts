@@ -20,6 +20,7 @@ import teamRouter from './routes/team.js';
 import voicemailRouter from './routes/voicemail.js';
 import pipedriveRouter from './routes/pipedrive.js';
 import diagRouter from './routes/diag.js';
+import smsRouter, { startScheduledSweep } from './routes/sms.js';
 
 // In dev, load .env from parent dir. In production (Docker), env vars are injected.
 if (process.env.NODE_ENV !== 'production') {
@@ -107,6 +108,7 @@ app.use('/api/team', teamRouter);
 app.use('/api/voicemail', voicemailRouter);
 app.use('/api/pipedrive', pipedriveRouter);
 app.use('/api/diag', diagRouter);
+app.use('/api/sms', smsRouter);
 
 // ─── Production: Serve Vite client as static files ─────────
 if (process.env.NODE_ENV === 'production') {
@@ -133,6 +135,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3001;
 if (process.env.NODE_ENV !== 'test') {
+  startScheduledSweep(); // fires due scheduled SMS every minute
   httpServer.listen(PORT, () => {
     console.log(`🚀 SalesCloser Cold Call Machine API running on http://localhost:${PORT}`);
   });
