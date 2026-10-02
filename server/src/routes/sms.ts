@@ -73,7 +73,18 @@ async function interpolate(body: string, userId: string, leadId: string | null):
     }
   } catch { /* non-fatal */ }
 
-  return body.replace(/\{\{\s*(\w+)\s*\}\}/g, (_m, key: string) => vars[key] ?? '');
+  // Dotted aliases map to the same vars (Quo-style: {{first.name}})
+  const alias: Record<string, string> = {
+    'first.name': 'first_name',
+    'last.name': 'last_name',
+    'company.name': 'company',
+    'rep.name': 'rep_name',
+    'full.name': 'first_name', // no separate full_name var; fall back to first
+  };
+  return body.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_m, key: string) => {
+    const resolved = vars[key] ?? vars[alias[key] ?? ''] ?? '';
+    return resolved;
+  });
 }
 
 // ── Admin API helper (server-side, bypasses RLS) ────────────────────
