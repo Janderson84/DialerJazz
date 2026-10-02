@@ -110,12 +110,13 @@ app.use('/api/pipedrive', pipedriveRouter);
 app.use('/api/diag', diagRouter);
 app.use('/api/sms', smsRouter);
 
-// ─── Production: Serve Vite client as static files ─────────
-if (process.env.NODE_ENV === 'production') {
-  // In Docker, client/dist is at ../../client/dist relative to server/dist/index.js
-  const clientDist = path.resolve(__dirname, '../../client/dist');
-  app.use(express.static(clientDist));
+// ─── Static client: serve UI on both ports (5173 dev server and 3001 API) ─────────
+// The 3001 API port also serves the built client so the published URL shows the app
+// instead of a bare 404. Dev mode (tsx watch) still gets the client via Vite:5173.
+const clientDist = path.resolve(__dirname, '../../client/dist');
+app.use(express.static(clientDist));
 
+if (process.env.NODE_ENV === 'production') {
   // SPA catch-all: any non-API route returns index.html
   app.get('*', (_req, res) => {
     res.sendFile(path.join(clientDist, 'index.html'));
