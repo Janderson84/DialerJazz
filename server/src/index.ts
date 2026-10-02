@@ -116,12 +116,12 @@ app.use('/api/sms', smsRouter);
 const clientDist = path.resolve(__dirname, '../../client/dist');
 app.use(express.static(clientDist));
 
-if (process.env.NODE_ENV === 'production') {
-  // SPA catch-all: any non-API route returns index.html
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(clientDist, 'index.html'));
-  });
-}
+// SPA catch-all: any non-API route returns index.html (all modes — dev
+// server proxies /api here, and the published 3001 URL serves deep links too)
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  res.sendFile(path.join(clientDist, 'index.html'));
+});
 
 // Centralized Error handler (must be last middleware)
 app.use(errorHandler);
