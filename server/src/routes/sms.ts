@@ -48,7 +48,8 @@ async function interpolate(body: string, userId: string, leadId: string | null):
         headers: admin.headers(),
       });
       if (res.ok) {
-        const rows = Array.isArray(await res.json()) ? await res.json() : (await res.json())?.data || [];
+        const j: any = await res.json();
+const rows = Array.isArray(j) ? j : j?.data || [];
         const lead = rows[0];
         if (lead) {
           vars.first_name = lead.first_name || 'there';
@@ -68,7 +69,8 @@ async function interpolate(body: string, userId: string, leadId: string | null):
       headers: admin.headers(),
     });
     if (res.ok) {
-      const rows = Array.isArray(await res.json()) ? await res.json() : (await res.json())?.data || [];
+      const j: any = await res.json();
+const rows = Array.isArray(j) ? j : j?.data || [];
       vars.rep_name = rows[0]?.display_name || '';
     }
   } catch { /* non-fatal */ }

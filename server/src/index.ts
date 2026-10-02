@@ -21,6 +21,7 @@ import voicemailRouter from './routes/voicemail.js';
 import pipedriveRouter from './routes/pipedrive.js';
 import diagRouter from './routes/diag.js';
 import smsRouter, { startScheduledSweep } from './routes/sms.js';
+import { ensureSchema } from './scripts/ensure-schema.js';
 
 // In dev, load .env from parent dir. In production (Docker), env vars are injected.
 if (process.env.NODE_ENV !== 'production') {
@@ -136,6 +137,7 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 3001;
 if (process.env.NODE_ENV !== 'test') {
+  ensureSchema(); // re-apply fragile SQL (campaign counter RPC) — InsForge reconciler drops unknown functions
   startScheduledSweep(); // fires due scheduled SMS every minute
   httpServer.listen(PORT, () => {
     console.log(`🚀 SalesCloser Cold Call Machine API running on http://localhost:${PORT}`);
