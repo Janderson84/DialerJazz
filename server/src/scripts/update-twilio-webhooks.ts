@@ -35,16 +35,22 @@ async function main() {
   for (const n of numbers) {
     const rep = phoneToRep.get(n.phone_number) || MASTER_ID();
     const smsUrl = `${PUBLIC_BASE}/api/sms/inbound?rep=${rep}`;
-    if (n.sms_url === smsUrl) {
+    const voiceUrl = `${PUBLIC_BASE}/api/twilio/inbound?rep=${rep}`;
+    const needsSms = n.sms_url !== smsUrl;
+    const needsVoice = n.voice_url !== voiceUrl;
+    if (!needsSms && !needsVoice) {
       console.log(`OK   ${n.phone_number} already -> ${smsUrl}`);
       continue;
     }
+    const body: Record<string, string> = {};
+    if (needsSms) { body.SmsUrl = smsUrl; body.SmsMethod = 'POST'; }
+    if (needsVoice) { body.VoiceUrl = voiceUrl; body.VoiceMethod = 'POST'; }
     const upd = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/IncomingPhoneNumbers/${n.sid}.json`, {
       method: 'POST',
       headers: { Authorization: auth, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ SmsUrl: smsUrl, SmsMethod: 'POST' }).toString(),
+      body: new URLSearchParams(body).toString(),
     });
-    console.log(upd.ok ? `SET  ${n.phone_number} -> ${smsUrl}` : `FAIL ${n.phone_number}: ${upd.status}`);
+    console.log(upd.ok ? `SET  ${n.phone_number} (sms=${needsSms}, voice=${needsVoice})` : `FAIL ${n.phone_number}: ${upd.status} ${upd.statusText}`);
   }
 }
 
