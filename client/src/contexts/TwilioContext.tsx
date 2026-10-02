@@ -53,6 +53,19 @@ try {
 import { twilioApi, settingsApi, callsApi } from '@/lib/api';
 import { useAuth } from './AuthContext';
 
+// Diag sink — module scope so BOTH initConnection and dial() can use it.
+// (Was a const inside initConnection; dial()'s promise handlers referenced it
+// and threw 'diag is not defined', killing attachCallListeners on every dial.)
+const diag = (event: string, detail?: string) => {
+  try {
+    fetch('/api/diag/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, detail }),
+    }).catch(() => {});
+  } catch { /* noop */ }
+};
+
 import type { ConnectionStatus, CallState, QualityMetrics } from './TelnyxContext';
 
 // ── Types ────────────────────────────────────────────────────────────
@@ -314,15 +327,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       loglevel.setLevel(loglevel.levels.DEBUG);
       // Telemetry sink: post SDK lifecycle events to the server so stuck calls
       // are diagnosable from logs alone (his browser console is invisible to us).
-      const diag = (event: string, detail?: string) => {
-        try {
-          fetch('/api/diag/event', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ event, detail }),
-          }).catch(() => {});
-        } catch { /* noop */ }
-      };
+      // diag is module-scoped (see top of file).
       window.addEventListener('error', (e) => diag('window.onerror', String(e.message).slice(0, 200)));
       diag('bundle.version', 'diag5-beaconed-sdk');
 
