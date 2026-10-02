@@ -124,6 +124,7 @@ export interface Campaign {
 
 export const statsApi = {
   getDashboard: () => apiFetch<{ totalCampaigns: number; totalLeads: number; totalCallsMade: number }>('/stats/dashboard'),
+  getTeamPulse: () => apiFetch<{ rep_user_id: string; name: string; is_master: boolean; calls: number; connected: number; talk_secs: number }[]>('/stats/team-pulse'),
 };
 
 export const campaignsApi = {

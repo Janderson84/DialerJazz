@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils';
 import CampaignsTable from '@/components/CampaignsTable';
 import { campaignsApi, settingsApi, statsApi, type Campaign } from '@/lib/api';
 
+type TeamPulseRow = { rep_user_id: string; name: string; is_master: boolean; calls: number; connected: number; talk_secs: number };
+
 import CreateCampaignModal from '@/components/CreateCampaignModal';
 
 export default function Dashboard() {
@@ -15,6 +17,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isTelnyxConnected, setIsTelnyxConnected] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [teamPulse, setTeamPulse] = useState<TeamPulseRow[]>([]);
 
   const fetchCampaigns = useCallback(async () => {
     try {
@@ -45,11 +48,21 @@ export default function Dashboard() {
     }
   }, []);
 
+  const fetchTeamPulse = useCallback(async () => {
+    try {
+      const { data } = await statsApi.getTeamPulse();
+      setTeamPulse(data || []);
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
   useEffect(() => {
     fetchCampaigns();
     fetchSettings();
     fetchStats();
-  }, [fetchCampaigns, fetchSettings, fetchStats]);
+    fetchTeamPulse();
+  }, [fetchCampaigns, fetchSettings, fetchStats, fetchTeamPulse]);
 
   // Compute stats from real data
   const totalLeads = stats.totalLeads;
@@ -165,6 +178,35 @@ export default function Dashboard() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Team Pulse Card */}
+        <div className="bg-white dark:bg-[#0F0F12] rounded-xl p-6 flex flex-col border border-gray-200 dark:border-[#1F1F23]">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 text-left flex items-center gap-2">
+            <Users className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-50" />
+            Team Pulse — Today
+          </h2>
+          <div className="space-y-2">
+            {teamPulse.length === 0 ? (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">No outbound calls logged yet today.</p>
+            ) : teamPulse.map((r) => (
+              <div key={r.rep_user_id} className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-all duration-200">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="h-7 w-7 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-[11px] font-semibold text-zinc-700 dark:text-zinc-200 shrink-0">
+                    {r.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate">{r.name}{r.is_master ? ' (you)' : ''}</h3>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{r.talk_secs >= 60 ? `${Math.floor(r.talk_secs / 60)}m ${r.talk_secs % 60}s` : `${r.talk_secs}s`} talk time</p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">{r.calls} call{r.calls === 1 ? '' : 's'}</span>
+                  {r.connected > 0 && <p className="text-[11px] text-emerald-600 dark:text-emerald-400">{r.connected} connected</p>}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
