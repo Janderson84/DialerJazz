@@ -59,6 +59,12 @@ export default function MessagesPage() {
 
   useEffect(() => { loadThreads(); }, [loadThreads]);
 
+  // Poll for new inbound messages so threads update without manual refresh
+  useEffect(() => {
+    const id = setInterval(loadThreads, 10_000);
+    return () => clearInterval(id);
+  }, [loadThreads]);
+
   // ── thread detail ──
   const openThread = useCallback(async (peer: string) => {
     setOpenPeer(peer);
@@ -318,9 +324,25 @@ function ThreadView({ peer, msgs, loading, status, onBack, onToggleStatus, onSen
     smsApi.listTemplates().then(({ data }) => setTemplates(data || [])).catch(() => {});
   }, []);
 
+  // Poll the thread so incoming replies auto-appear (5s)
+  const [liveMsgs, setLiveMsgs] = useState<SmsMessage[] | null>(null);
+  const shownMsgs = liveMsgs ?? msgs;
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [msgs.length]);
+  }, [shownMsgs.length]);
+
+  useEffect(() => {
+    setLiveMsgs(null);
+    if (!peer) return;
+    const id = setInterval(async () => {
+      try {
+        const { data } = await smsApi.getThread(peer);
+        setLiveMsgs(data || []);
+      } catch { /* keep last state on transient errors */ }
+    }, 5_000);
+    return () => clearInterval(id);
+  }, [peer]);
 
   const applyTemplate = (name: string) => {
     const tpl = templates.find((t) => t.name === name);
@@ -360,11 +382,11 @@ function ThreadView({ peer, msgs, loading, status, onBack, onToggleStatus, onSen
         <CardContent className="p-4 h-full overflow-y-auto" ref={undefined}>
           {loading ? (
             <div className="h-full grid place-items-center text-muted-foreground text-sm">Loading…</div>
-          ) : msgs.length === 0 ? (
+          ) : shownMsgs.length === 0 ? (
             <div className="h-full grid place-items-center text-muted-foreground text-sm">No messages with this contact yet.</div>
           ) : (
             <div className="flex flex-col gap-2">
-              {msgs.map((m) => {
+              {shownMsgs.map((m) => {
                 const mine = m.direction === 'outbound';
                 const failed = m.status === 'failed';
                 const cancelled = m.status === 'cancelled';
