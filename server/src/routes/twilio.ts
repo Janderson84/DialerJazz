@@ -8,6 +8,33 @@ import { fireAutoReplies } from './sms.js';
 const PUBLIC_BASE_URL = () =>
   process.env.PUBLIC_BASE_URL || 'https://3a50c7f3047f--3001.jackhamr.app';
 
+// ── Rep caller-ID resolution ───────────────────────────────────────
+// A rep's outbound caller ID must be the rep's OWN line (team_members
+// phone_number), never the master account's number — otherwise every
+// rep's calls display as the master line. Falls back to null when the
+// rep has no line on the roster (caller ID resolution then uses what
+// the client sent).
+async function getRepLineNumber(repId: string | undefined): Promise<string | null> {
+  if (!repId || !/^[0-9a-f-]{36}$/i.test(repId)) return null;
+  try {
+    const base = process.env.INFORGE_URL || process.env.INSFORGE_URL || 'http://localhost:7130';
+    const username = process.env.INSFORGE_ADMIN_USER || 'admin';
+    const password = process.env.INSFORGE_ADMIN_PASSWORD;
+    if (!password) return null;
+    const s = await fetch(`${base}/api/auth/admin/sessions`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!s.ok) return null;
+    const { accessToken } = await s.json();
+    const rows = await fetch(`${base}/api/database/records/team_members?rep_user_id=eq.${repId}&select=phone_number`, {
+      headers: { Authorization: `Bearer ${accessToken}`, apikey: accessToken },
+    }).then(r => r.json());
+    const row = (Array.isArray(rows) ? rows : rows?.data || [])[0];
+    return row?.phone_number || null;
+  } catch { return null; }
+}
+
 const router = Router();
 const { AccessToken } = twilio.jwt;
 const { VoiceGrant } = AccessToken;
@@ -113,11 +140,17 @@ router.post('/voice', express.urlencoded({ extended: false }), async (req: Reque
       // Outbound to a phone number — use answering machine detection with a
       // rep-aware callback. If the callee is a machine, Twilio drops the rep's
       // voicemail; if human, the callback bridges the call to the rep's browser.
-      const repId = (req.query.rep as string) || MASTER_ID();
+      // Rep-aware caller ID: use the rep's own roster line, not the master number.
+      // connect() params arrive in the POST body (To/From/Rep).
+      const repId = (req.body.Rep as string) || (req.query.rep as string) || '';
+      const attributionId = /^[0-9a-f-]{36}$/i.test(repId) ? repId : MASTER_ID();
+      const repLine = await getRepLineNumber(repId);
+      const outboundCallerId = repLine || from;
+      console.log(`[Twilio Voice Webhook] outbound callerId=${outboundCallerId} (rep=${repId || 'master'}, repLine=${repLine || 'none'})`);
       const clean = to.replace(/[^\d+]/g, '');
-      const amd = twiml.dial({ callerId: from, machineDetection: 'DetectMessageEnd', machineDetectionTimeout: 10 } as any);
+      const amd = twiml.dial({ callerId: outboundCallerId, machineDetection: 'DetectMessageEnd', machineDetectionTimeout: 10 } as any);
       amd.number({
-        url: `${PUBLIC_BASE_URL()}/api/voicemail/amd-callback?rep=${repId}`,
+        url: `${PUBLIC_BASE_URL()}/api/voicemail/amd-callback?rep=${attributionId}`,
         method: 'POST',
       } as any, clean);
     } else if (to) {
