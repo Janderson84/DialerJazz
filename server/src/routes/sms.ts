@@ -2,7 +2,7 @@ import { Router, Request } from 'express';
 import type { Response } from 'express-serve-static-core';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import { getMasterTwilioSettings } from '../lib/masterSettings.js';
+import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
 import twilio from 'twilio';
 
 /**
@@ -567,13 +567,23 @@ router.post('/inbound', (req: Request, res: Response) => {
       // Who owns this receiving number? rep param, else match team_members.phone_number
       let ownerId = repId;
       if (!/^[0-9a-f-]{36}$/.test(ownerId)) {
+        // Test-webhook body values are unformatted; normalize both sides before matching
+        const toNorm = '+' + String(to).replace(/[^\d]/g, '');
         const res2 = await fetch(
-          `${admin.base}/api/database/records/team_members?phone_number=eq.${to}&select=rep_user_id&limit=1`,
+          `${admin.base}/api/database/records/team_members?phone_number=eq.${toNorm}&select=rep_user_id&limit=1`,
           { headers: admin.headers() }
         );
         const rows = res2.ok ? ((await res2.json()) || []) : [];
         const arr = Array.isArray(rows) ? rows : rows?.data || [];
         ownerId = arr[0]?.rep_user_id || '';
+      }
+      if (!/^[0-9a-f-]{36}$/.test(ownerId)) {
+        // Master's own line (James): default ownership to the master user
+        const settings = await getMasterTwilioSettings();
+        if (settings?.twilio_caller_number && ('+' + String(to).replace(/[^\d]/g, '')) === settings.twilio_caller_number) {
+          ownerId = MASTER_ID();
+          console.log('[sms/inbound] resolved to master line', to);
+        }
       }
       if (!/^[0-9a-f-]{36}$/.test(ownerId)) {
         console.error('[sms/inbound] could not resolve owner for', to);
