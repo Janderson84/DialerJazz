@@ -37,6 +37,7 @@ function formatTime(iso: string): string {
 
 export default function MessagesPage() {
   const [tab, setTab] = useState<TabKey>('messages');
+  const [newOpen, setNewOpen] = useState(false);
 
   // ── threads ──
   const [threads, setThreads] = useState<SmsMessage[]>([]);
@@ -122,7 +123,7 @@ export default function MessagesPage() {
                 threads={threads}
                 loading={threadsLoading}
                 onOpen={openThread}
-                onNew={() => toast.info('Pick a contact from Leads, or use the dialer after a call — sending needs a destination number.')}
+                onNew={() => setNewOpen(true)}
               />
             )}
           </TabsContent>
@@ -136,7 +137,100 @@ export default function MessagesPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <NewMessageDialog
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        onSent={async (peer) => {
+          setNewOpen(false);
+          await loadThreads();
+          openThread(peer);
+        }}
+      />
     </div>
+  );
+}
+
+// ══════════════════ New message dialog (type a number + send) ═══════
+
+function NewMessageDialog({ open, onClose, onSent }: {
+  open: boolean;
+  onClose: () => void;
+  onSent: (peer: string) => void;
+}) {
+  const [to, setTo] = useState('');
+  const [body, setBody] = useState('');
+  const [templates, setTemplates] = useState<SmsTemplate[]>([]);
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    if (open) { setTo(''); setBody(''); }
+  }, [open]);
+
+  useEffect(() => {
+    if (open) smsApi.listTemplates().then(({ data }) => setTemplates(data || [])).catch(() => {});
+  }, [open]);
+
+  const clean = to.replace(/[^\d+]/g, '');
+  const valid = /^\+?1?\d{10,11}$/.test(clean);
+
+  const send = async () => {
+    setSending(true);
+    try {
+      await smsApi.send({ to, body });
+      toast.success('Message sent');
+      onSent(clean.startsWith('+') ? clean : `+1${clean.length === 10 ? clean : clean.replace(/^1/, '')}`);
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to send');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>New message</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Input
+            type="tel"
+            placeholder="Phone number — e.g. 555 123 4567"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && valid && body.trim()) send(); }}
+            autoFocus
+          />
+          {templates.length > 0 && (
+            <div className="flex gap-1.5 flex-wrap">
+              {templates.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setBody(t.body)}
+                  className="px-2.5 py-1 rounded-full text-xs font-medium border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <textarea
+            placeholder="Type your message…"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            maxLength={1000}
+            className="w-full min-h-[100px] rounded-xl border border-border bg-transparent p-3 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-foreground/20"
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={send} disabled={sending || !valid || !body.trim()}>
+              <Send className="h-4 w-4 mr-1.5" /> {sending ? 'Sending…' : 'Send'}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
