@@ -50,7 +50,7 @@ try {
 } catch (wrapErr) {
   console.error('[TwilioContext] Failed to wrap Device.connect:', wrapErr);
 }
-import { twilioApi, settingsApi } from '@/lib/api';
+import { twilioApi, settingsApi, callsApi } from '@/lib/api';
 import { useAuth } from './AuthContext';
 
 import type { ConnectionStatus, CallState, QualityMetrics } from './TelnyxContext';
@@ -81,7 +81,7 @@ export interface TwilioContextValue {
   heldCallerNumber: string;
 
   // Actions
-  dial: (destinationNumber: string, callerNumber?: string) => void;
+  dial: (destinationNumber: string, callerNumber?: string, opts?: { autoLog?: boolean }) => void;
   hangup: () => void;
   answerIncoming: () => void;
   rejectIncoming: () => void;
@@ -111,6 +111,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   // Timers
   const primaryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Mirrored duration for use inside event listeners (state reads go stale there)
+  const primaryDurationRef = useRef(0);
+  // Metadata of the current/last call for auto-logging on disconnect.
+  // dial() sets direction 'outbound'; answerIncoming() sets 'inbound'.
+  // CampaignDialerPage passes { autoLog: false } and logs its own lead-aware call.
+  const callMetaRef = useRef<{ direction: 'outbound' | 'inbound'; to_number?: string; from_number?: string } | null>(null);
 
   // Connection
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
@@ -126,9 +132,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   // Incoming call state
   const incomingCallRef = useRef<Call | null>(null);
+  // Ref mirror of incomingCallerNumber — the state read inside answerIncoming
+  // would be stale under StrictMode double-mounts (same trap as user?.id).
+  const incomingCallerNumberRef = useRef('');
   const [incomingCall, setIncomingCall] = useState<Call | null>(null);
   const [incomingCallerNumber, setIncomingCallerNumber] = useState('');
   const [incomingCallerName, setIncomingCallerName] = useState('');
+  useEffect(() => { incomingCallerNumberRef.current = incomingCallerNumber; }, [incomingCallerNumber]);
 
   // Held call state (interface parity — limited support)
   const [heldCall, setHeldCall] = useState<Call | null>(null);
@@ -147,8 +157,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
   const startPrimaryTimer = useCallback(() => {
     if (primaryTimerRef.current) clearInterval(primaryTimerRef.current);
     setPrimaryCallDuration(0);
+    primaryDurationRef.current = 0;
     primaryTimerRef.current = setInterval(() => {
-      setPrimaryCallDuration((prev) => prev + 1);
+      setPrimaryCallDuration((prev) => {
+        primaryDurationRef.current = prev + 1;
+        return prev + 1;
+      });
     }, 1000);
   }, []);
 
@@ -181,6 +195,28 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       setIsMuted(false);
       setIsHeld(false);
       setActiveCallRoute(null);
+
+      // Auto-log leadless calls (manual dialer / inbound). Campaign calls log
+      // themselves with lead_id via CampaignDialerPage — do not double-log.
+      const meta = callMetaRef.current;
+      callMetaRef.current = null;
+      const duration = primaryDurationRef.current;
+      if (meta && duration > 0) {
+        const payload = {
+          lead_id: null,
+          campaign_id: null,
+          duration_seconds: duration,
+          status: 'completed',
+          disposition: meta.direction === 'inbound' ? 'inbound_call' : 'manual_call',
+          notes: meta.direction === 'inbound' ? 'Inbound call' : 'Manual out-of-band call',
+          provider: 'twilio' as const,
+          direction: meta.direction,
+          to_number: meta.to_number || null,
+          from_number: meta.from_number || null,
+        };
+        console.log('[TwilioContext] Auto-logging call:', payload);
+        callsApi.log(payload).catch((err) => console.error('[TwilioContext] Auto-log failed:', err));
+      }
     });
 
     call.on('cancel', () => {
@@ -340,6 +376,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         incomingCallRef.current = call;
         setIncomingCall(call);
         setIncomingCallerNumber(call.parameters?.From || 'Unknown');
+        incomingCallerNumberRef.current = call.parameters?.From || 'Unknown';
         setIncomingCallerName(call.parameters?.FromCity || '');
 
         // Listen for cancel/reject on incoming call
@@ -412,7 +449,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   // ── Call actions ───────────────────────────────────────────────────
   const dial = useCallback(
-    async (destinationNumber: string, callerNumber?: string) => {
+    async (destinationNumber: string, callerNumber?: string, opts?: { autoLog?: boolean }) => {
       // Prefer the live device handle: React StrictMode double-mounts providers,
       // leaving stale deviceRefs bound to destroyed devices whose connect()
       // silently no-ops. window.__scDevice always holds the latest registered one.
@@ -434,6 +471,12 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       }
 
       console.log('[TwilioContext] dial():', { destinationNumber, resolvedCallerNumber });
+      // Call metadata for auto-logging on disconnect (unless the caller logs itself,
+      // e.g. CampaignDialerPage which logs with lead_id for the attempt counter).
+      callMetaRef.current = opts?.autoLog === false
+        ? null
+        : { direction: 'outbound', to_number: destinationNumber };
+      primaryDurationRef.current = 0;
       try {
         fetch('/api/diag/event', {
           method: 'POST',
@@ -572,6 +615,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       try {
         fetch('/api/diag/event', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'hangup.no_call_object', detail: 'primaryCallRef and live _activeCall both empty' }) }).catch(() => {});
       } catch { /* noop */ }
+      // No disconnect event will fire — drop any stale call meta so it can't
+      // leak into the next call's auto-log.
+      callMetaRef.current = null;
     }
     stopPrimaryTimer();
     setPrimaryCallState('done');
@@ -588,6 +634,14 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       primaryCallRef.current = incomingCallRef.current;
       setPrimaryCall(incomingCallRef.current);
       setPrimaryCallState('active');
+      // From is usually "client:user_<id>" for browser clients or an E.164 for
+      // real phones — keep the raw value; the server filters non-digit ones out
+      // of the Pipedrive push.
+      callMetaRef.current = {
+        direction: 'inbound',
+        from_number: incomingCallerNumberRef.current || incomingCallRef.current.parameters?.From || '',
+      };
+      primaryDurationRef.current = 0;
       startPrimaryTimer();
       attachCallListeners(incomingCallRef.current);
 

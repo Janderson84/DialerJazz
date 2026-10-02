@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Phone, Delete, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { callsApi } from '@/lib/api';
 import { useVoice } from '@/contexts/VoiceContext';
 import CallControls from '@/components/CallControls';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -11,10 +10,15 @@ import { Badge } from "@/components/ui/badge";
 
 export default function ManualDialerPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const voice = useVoice();
 
   const [numberInput, setNumberInput] = useState('');
   const [showDTMF, setShowDTMF] = useState(false);
+  // The number actually passed to voice.dial() — the input can be edited
+  // mid-call, so we snapshot it for the call log.
+  const dialedNumberRef = useRef('');
+  const protocolRegisteredRef = useRef(false);
 
   // Track this route for the ActiveCallBubble — only set if no call is already active
   // (prevents overwriting campaign route when user visits this page mid-call)
@@ -25,30 +29,51 @@ export default function ManualDialerPage() {
     }
   }, []);
 
+  // ── tel: protocol handler (click-to-call from Pipedrive) ──────────
+  // Register this page as the browser's tel: handler ONCE. After the user
+  // accepts the browser prompt, clicking any phone number in Pipedrive (which
+  // renders numbers as tel: links) opens /dialer?tel=<number>.
+  useEffect(() => {
+    if (protocolRegisteredRef.current) return;
+    protocolRegisteredRef.current = true;
+    try {
+      if ('registerProtocolHandler' in navigator) {
+        navigator.registerProtocolHandler?.('tel', `${window.location.origin}/dialer?tel=%s`, 'DialerJazz');
+      }
+    } catch (err) {
+      // Unsupported (Safari/Firefox) or permission denied — manual dialing still works.
+      console.log('[ManualDialer] tel: handler registration skipped:', err);
+    }
+  }, []);
+
+  // ── ?tel= param → prefill (Pipedrive click-to-call) ───────────────
+  useEffect(() => {
+    const raw = searchParams.get('tel');
+    if (!raw) return;
+    let candidate = raw;
+    try { candidate = decodeURIComponent(raw); } catch { /* keep raw */ }
+    // Strip a tel: scheme prefix if the handler passes the full URI
+    candidate = candidate.replace(/^tel:/i, '');
+    const normalized = candidate.replace(/[^\d+]/g, '');
+    if (normalized) {
+      setNumberInput(normalized);
+      dialedNumberRef.current = normalized;
+      document.querySelector<HTMLInputElement>('input[placeholder*="000-0000"]')?.focus();
+    }
+    // Clear the param so refresh/back doesn't re-trigger (and doesn't redial)
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const handleDial = () => {
     if (!voice.sipConfigured) return toast.error('Configure a telephony provider in Connectors first.');
     if (voice.connectionStatus !== 'registered') return toast.error('Connecting...');
     if (numberInput.trim() === '') return toast.error('Please enter a phone number to call.');
-    voice.dial(numberInput);
+    dialedNumberRef.current = numberInput.trim();
+    voice.dial(numberInput.trim());
   };
 
-  const handleHangUp = async () => {
-    const duration = voice.primaryCallDuration;
+  const handleHangUp = () => {
     voice.hangup();
-    if (duration > 0) {
-      try {
-        await callsApi.log({
-          lead_id: null,
-          campaign_id: null,
-          duration_seconds: duration,
-          status: 'completed',
-          disposition: 'manual_call',
-          notes: 'Manual out-of-band call',
-        });
-      } catch (err) {
-        console.error('Failed to save manual call log', err);
-      }
-    }
   };
 
   const handleNumberInput = (digit: string) => {

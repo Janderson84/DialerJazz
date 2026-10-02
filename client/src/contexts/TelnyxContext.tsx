@@ -69,7 +69,7 @@ export interface TelnyxContextValue {
   heldCallerNumber: string;
 
   // Actions
-  dial: (destinationNumber: string, callerNumber?: string) => void;
+  dial: (destinationNumber: string, callerNumber?: string, opts?: { autoLog?: boolean }) => void;
   hangup: () => void;
   answerIncoming: () => void;
   rejectIncoming: () => void;
