@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '../.env' });
 import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
 
-const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || 'https://3a50c7f3047f--5173.jackhamr.app';
+const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || 'https://3a50c7f3047f--3001.jackhamr.app';
 
 async function main() {
   const settings = await getMasterTwilioSettings();
