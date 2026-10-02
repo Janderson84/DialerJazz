@@ -216,9 +216,15 @@ function NewMessageDialog({ open, onClose, onSent }: {
             </div>
           )}
           <textarea
-            placeholder="Type your message…"
+            placeholder="Type your message… (Enter to send)"
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                if (valid && body.trim() && !sending) send();
+              }
+            }}
             maxLength={1000}
             className="w-full min-h-[100px] rounded-xl border border-border bg-transparent p-3 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-foreground/20"
           />
@@ -409,8 +415,13 @@ function ThreadView({ peer, msgs, loading, status, onBack, onToggleStatus, onSen
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send(); }}
-              placeholder="Type a message… (⌘/Ctrl+Enter to send)"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (draft.trim() && !sending) send();
+                }
+              }}
+              placeholder="Type a message… (Enter to send, Shift+Enter for newline)"
               className="flex-1 min-h-[44px] max-h-32 resize-none rounded-xl border border-border bg-transparent p-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-foreground/20"
             />
             <Button onClick={send} disabled={sending || !draft.trim()} className="h-11 gap-1.5">
