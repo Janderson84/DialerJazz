@@ -18,6 +18,7 @@ export default function ActiveCallBubble() {
     primaryCallState,
     primaryCallDuration,
     activeCallRoute,
+    activeCallNumber,
   } = useVoice();
 
   const navigate = useNavigate();
@@ -57,9 +58,15 @@ export default function ActiveCallBubble() {
             <p className="text-xs font-bold uppercase tracking-widest text-foreground">
               In Call
             </p>
-            <p className="text-lg font-mono font-bold text-foreground tabular-nums">
-              {minutes}:{seconds}
-            </p>
+            {activeCallNumber ? (
+              <p className="text-sm font-mono font-bold text-foreground tabular-nums">
+                {activeCallNumber} <span className="text-muted-foreground">·</span> {minutes}:{seconds}
+              </p>
+            ) : (
+              <p className="text-lg font-mono font-bold text-foreground tabular-nums">
+                {minutes}:{seconds}
+              </p>
+            )}
           </div>
 
           <span className="text-xs font-medium text-muted-foreground ml-1 opacity-0 group-hover:opacity-100 transition-opacity">

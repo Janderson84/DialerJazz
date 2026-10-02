@@ -17,6 +17,19 @@ import {
 import loglevel from 'loglevel';
 import { Device, Call } from '@twilio/voice-sdk';
 
+// Module-level diag sink: usable from any scope (initConnection AND dial()).
+// It previously lived inside initConnection, which made every dial() throw
+// ReferenceError: diag is not defined at connect time (stuck-on-DIALING bug).
+const diag = (event: string, detail?: string) => {
+  try {
+    fetch('/api/diag/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event, detail }),
+    }).catch(() => {});
+  } catch { /* noop */ }
+};
+
 // APP-LEVEL instrumentation: wrap Device.prototype.connect so every connect
 // attempt is visible regardless of which SDK instance is alive in the page.
 try {
@@ -285,15 +298,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       loglevel.setLevel(loglevel.levels.DEBUG);
       // Telemetry sink: post SDK lifecycle events to the server so stuck calls
       // are diagnosable from logs alone (his browser console is invisible to us).
-      const diag = (event: string, detail?: string) => {
-        try {
-          fetch('/api/diag/event', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ event, detail }),
-          }).catch(() => {});
-        } catch { /* noop */ }
-      };
+      // (diag is now module-level — see top of file.)
       window.addEventListener('error', (e) => diag('window.onerror', String(e.message).slice(0, 200)));
       diag('bundle.version', 'diag5-beaconed-sdk');
 
@@ -598,6 +603,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       setPrimaryCall(incomingCallRef.current);
       setPrimaryCallState('active');
       startPrimaryTimer();
+      setActiveCallNumber(incomingCallerNumber || null);
       attachCallListeners(incomingCallRef.current);
 
       // Clear incoming state
@@ -606,7 +612,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       setIncomingCallerNumber('');
       setIncomingCallerName('');
     }
-  }, [startPrimaryTimer, attachCallListeners]);
+  }, [startPrimaryTimer, attachCallListeners, incomingCallerNumber]);
 
   const rejectIncoming = useCallback(() => {
     if (incomingCallRef.current) {

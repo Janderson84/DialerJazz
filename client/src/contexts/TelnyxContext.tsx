@@ -219,6 +219,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
           setPrimaryCallState('active');
           startPrimaryTimer();
           setSipError(null);
+          setActiveCallNumber(incomingCallerNumber || 'Unknown');
 
           // Clear incoming state
           incomingCallRef.current = null;
@@ -308,7 +309,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [primaryCallState, startPrimaryTimer, stopPrimaryTimer, stopHeldTimer]
+    [primaryCallState, startPrimaryTimer, stopPrimaryTimer, stopHeldTimer, incomingCallerNumber]
   );
 
   // ── Connect to Telnyx ──────────────────────────────────────────────
@@ -505,9 +506,10 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
   const answerIncoming = useCallback(() => {
     if (incomingCallRef.current) {
       incomingCallRef.current.answer();
+      setActiveCallNumber(incomingCallerNumber || 'Unknown');
       // State transition handled by notification handler
     }
-  }, []);
+  }, [incomingCallerNumber]);
 
   const rejectIncoming = useCallback(() => {
     if (incomingCallRef.current) {

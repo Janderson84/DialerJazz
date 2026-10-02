@@ -178,7 +178,7 @@ export default function ManualDialerPage() {
                     <div className="h-32 w-32 rounded-full border-4 border-emerald-500/20 bg-emerald-500/10 flex items-center justify-center mx-auto mb-6">
                       <Phone className="h-12 w-12 text-emerald-500 animate-pulse" />
                     </div>
-                    <h2 className="text-3xl font-mono font-bold text-foreground mb-2">{numberInput}</h2>
+                    <h2 className="text-3xl font-mono font-bold text-foreground mb-2">{voice.activeCallNumber || numberInput}</h2>
                     <p className="text-lg text-emerald-500 font-medium">Connecting Call...</p>
                  </div>
                ) : (

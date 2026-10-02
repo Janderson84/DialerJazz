@@ -512,6 +512,7 @@ export default function CampaignDialerPage() {
               <InCallHUD
                 callState={voice.primaryCallState}
                 callDuration={voice.primaryCallDuration}
+                callNumber={voice.activeCallNumber}
                 remoteStream={voice.primaryCall?.remoteStream || null}
                 showDTMF={showDTMF}
                 onSendDTMF={voice.sendDTMF}
