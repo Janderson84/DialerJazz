@@ -9,8 +9,9 @@
 | Version | Codename | Status | Focus |
 |---|---|---|---|
 | **V1** | "First Call" | ✅ Shipped | MVP — Card UX + Telnyx WebRTC + Campaigns + Manual Dialer |
-| **V2** | "Machine" | 🔲 Planned | Power Dialer + Call Recording + Analytics |
-| **V3** | "Switchboard" | 🔲 Planned | Multi-Provider + CRM Integration + Teams |
+| **V1.5** | "Machine" | 🔶 Partially Shipped | Power Dialer + Twilio + SMS/Messaging + Pipedrive |
+| **V2** | "Insights" | 🔲 Planned | Call Recording + Analytics + Smart Dialing |
+| **V3** | "Switchboard" | 🔲 Planned | Multi-Provider + CRM Deep Integration + Teams |
 | **V4** | "Enterprise" | 🔲 Planned | Predictive Dialer + Compliance + Mobile |
 
 ---
@@ -48,15 +49,31 @@
 
 ---
 
-## V2 — "Machine" (Planned)
+## V1.5 — "Machine" (Partially Shipped)
 
-> Auto-dial enhancements, call recording, transcription, analytics.
+> Power dialing + Twilio + messaging + CRM touchpoints.
+
+### Shipped 2026-09-28 → 2026-10-03
+- [x] Power dialer mode (auto-advance after disposition)
+- [x] Twilio WebRTC calling (second provider, per-rep lines)
+- [x] Rep-aware outbound caller ID (reps call from their OWN line, not master)
+- [x] Master-credential inheritance (reps never configure Connectors)
+- [x] SMS/Messaging module: templates w/ variables, one-to-one send, scheduled send, open/closed threads, auto-replies (inbound/missed-call/voicemail), post-call SMS overlay
+- [x] Pipedrive click-to-call (tel: handler) + auto call logging
+- [x] Campaign progress counter (self-healing schema guard at server boot)
+- [x] Missed-call auto-replies via dial-status webhook
+
+### Remaining in V1.5
+- [ ] Pipedrive token activation (awaiting James's API token in Connectors)
+- [ ] Auto-dial delay configurable (currently fixed ~1.5s)
+- [ ] Scheduled-send "auto-cancel if reply" rule (schema exists, check reply-first cancel)
+
+## V2 — "Insights" (Planned)
+
+> Recording, transcription, analytics.
 
 ### Features
-- [ ] Auto-dial next lead after disposition (configurable delay: 0–10 sec)
-- [ ] Pause/resume campaign mid-session
-- [ ] Skip rules (auto-skip leads with no phone, DNC, already called today)
-- [ ] Telnyx call recording API integration
+- [ ] Telnyx/Twilio call recording API integration
 - [ ] Recording playback in lead detail view
 - [ ] Whisper/Deepgram transcription of recordings
 - [ ] Analytics dashboard (calls today, connected %, avg duration)
@@ -65,8 +82,7 @@
 - [ ] Callback scheduling with reminders
 - [ ] Timezone display per lead
 - [ ] Calling hours enforcement (8AM–9PM lead's local time)
-
----
+- [ ] Per-rep analytics view (rep leaderboard)
 
 ## V3 — "Switchboard" (Planned)
 
@@ -74,13 +90,14 @@
 
 ### Features
 - [ ] Provider abstraction layer (unified call interface)
-- [ ] Twilio WebRTC adapter
+- [x] Twilio WebRTC adapter (shipped early, V1.5)
 - [ ] Plivo WebRTC adapter
 - [ ] Provider credential management per user
 - [ ] Local presence dialing
 - [ ] Built-in mini-CRM (contacts, companies, deals)
 - [ ] HubSpot integration
 - [ ] Webhook support (call events → external systems)
+- [ ] SMS/email follow-up automation deepening (basic auto-replies shipped V1.5)
 - [ ] Team Spaces (multi-user with roles)
 - [ ] Campaign scheduling
 - [ ] REST API for external integrations
@@ -102,4 +119,3 @@
 - [ ] Team leaderboard
 - [ ] PWA + React Native mobile app
 - [ ] AI call summaries
-- [ ] SMS/email follow-up automation
