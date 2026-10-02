@@ -159,10 +159,11 @@ export default function MessagesPage() {
 
 // ══════════════════ New message dialog (type a number + send) ═══════
 
-function NewMessageDialog({ open, onClose, onSent }: {
+export function NewMessageDialog({ open, onClose, onSent, initialTo }: {
   open: boolean;
   onClose: () => void;
   onSent: (peer: string) => void;
+  initialTo?: string;
 }) {
   const [to, setTo] = useState('');
   const [body, setBody] = useState('');
@@ -170,8 +171,8 @@ function NewMessageDialog({ open, onClose, onSent }: {
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    if (open) { setTo(''); setBody(''); }
-  }, [open]);
+    if (open) { setTo(initialTo || ''); setBody(''); }
+  }, [open, initialTo]);
 
   useEffect(() => {
     if (open) smsApi.listTemplates().then(({ data }) => setTemplates(data || [])).catch(() => {});

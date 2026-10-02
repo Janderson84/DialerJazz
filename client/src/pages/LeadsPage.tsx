@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Users as UsersIcon, Search, Loader2, Filter, X, Globe, MapPin, Star, Tag as TagIcon } from 'lucide-react';
+import { Users as UsersIcon, Search, Loader2, Filter, X, Globe, MapPin, Star, Tag as TagIcon, MessageSquare } from 'lucide-react';
 import Pagination from '@/components/ui/pagination';
+import { NewMessageDialog } from './MessagesPage';
 import { usePagination } from '@/hooks/usePagination';
 import { toast } from 'sonner';
 import { leadsApi, type Lead } from '@/lib/api';
@@ -41,6 +42,8 @@ export default function LeadsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [smsOpen, setSmsOpen] = useState(false);
+  const [smsTo, setSmsTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
   const { currentPage, totalPages, setCurrentPage, setMeta, perPage } =
@@ -231,7 +234,19 @@ export default function LeadsPage() {
 
                       {/* Contact Info */}
                       <td className="px-4 py-4">
-                        <div className="text-foreground font-mono text-sm">{lead.phone}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-foreground font-mono text-sm">{lead.phone}</span>
+                          {lead.phone && (
+                            <button
+                              type="button"
+                              title="Send SMS"
+                              className="text-muted-foreground hover:text-primary transition-colors"
+                              onClick={() => { setSmsTo(lead.phone); setSmsOpen(true); }}
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
                         {lead.email && (
                           <div className="text-xs text-muted-foreground truncate max-w-[150px]">{lead.email}</div>
                         )}
@@ -340,6 +355,12 @@ export default function LeadsPage() {
           <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </>
       )}
+      <NewMessageDialog
+        open={smsOpen}
+        onClose={() => setSmsOpen(false)}
+        onSent={() => setSmsOpen(false)}
+        initialTo={smsTo}
+      />
     </div>
   );
 }

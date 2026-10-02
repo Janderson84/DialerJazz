@@ -31,6 +31,7 @@ import { useLocalCalling } from '@/hooks/useLocalCalling';
 import CallControls from '@/components/CallControls';
 import InCallHUD from '@/components/InCallHUD';
 import DispositionOverlay from '@/components/DispositionOverlay';
+import SmsAfterCallOverlay from '@/components/SmsAfterCallOverlay';
 
 type DialerMode = 'power' | 'click';
 type Disposition = 'answered' | 'follow_up' | 'not_interested' | 'no_answer' | 'voicemail' | 'busy' | 'dnc';
@@ -62,6 +63,9 @@ export default function CampaignDialerPage() {
   const dialerSessionMode = (campaign?.dialer_mode as DialerMode) || 'click';
   const [showDisposition, setShowDisposition] = useState(false);
   const [isDisposing, setIsDisposing] = useState(false);
+  const [showSmsAfterCall, setShowSmsAfterCall] = useState(false);
+  const [pendingSmsLead, setPendingSmsLead] = useState<{ id: string; name: string; phone: string } | null>(null);
+  const smsThenAdvanceRef = useRef<(() => void) | null>(null);
   const [showDTMF, setShowDTMF] = useState(false);
   const [notes, setNotes] = useState('');
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
@@ -204,8 +208,10 @@ export default function CampaignDialerPage() {
       toast.success(`Marked as ${dispositionLabel}`);
       setShowDisposition(false);
 
-      if (dialerSessionMode === 'power') {
-        // Power dialer: auto-swipe to next lead, then auto-dial it.
+      // Offer a post-call text before advancing (power dialer advances after
+      // the overlay is dismissed; click-to-call just shows the overlay).
+      const advance = () => {
+        if (dialerSessionMode !== 'power') return;
         const isLast = currentIndex >= leads.length - 1;
         if (isLast) {
           toast.success('All leads dialed! 🎉');
@@ -213,9 +219,7 @@ export default function CampaignDialerPage() {
         }
         setTimeout(() => {
           void (async () => {
-            // Swipe the card away first (fires navigateNext internally)
             await triggerSwipeLeft();
-            // Small settle delay, then dial the next lead automatically
             setTimeout(() => {
               const next = leads[currentIndex + 1];
               if (next && !['trying', 'ringing', 'active'].includes(voice.primaryCallState)) {
@@ -223,9 +227,14 @@ export default function CampaignDialerPage() {
               }
             }, 1200);
           })();
-        }, 1500);
-      }
-      // If click-to-call, we do nothing and wait for manual swipe!
+        }, 300);
+      };
+
+      const lead = currentLead;
+      const leadName = `${lead.first_name} ${lead.last_name || ''}`.trim() || lead.phone;
+      setPendingSmsLead({ id: lead.id, name: leadName, phone: lead.phone });
+      smsThenAdvanceRef.current = dialerSessionMode === 'power' ? advance : null;
+      setShowSmsAfterCall(true);
 
     } catch (err: unknown) {
       toast.error('Failed to save disposition');
@@ -524,6 +533,21 @@ export default function CampaignDialerPage() {
                 dispositions={DISPOSITIONS}
                 isDisposing={isDisposing}
                 onSelect={handleDisposition}
+              />
+
+              {/* Post-Call SMS offer (dismissible; advances power dialer on close) */}
+              <SmsAfterCallOverlay
+                visible={showSmsAfterCall}
+                leadName={pendingSmsLead?.name || ''}
+                leadPhone={pendingSmsLead?.phone || ''}
+                leadId={pendingSmsLead?.id || ''}
+                onDone={() => {
+                  setShowSmsAfterCall(false);
+                  setPendingSmsLead(null);
+                  const advance = smsThenAdvanceRef.current;
+                  smsThenAdvanceRef.current = null;
+                  advance?.();
+                }}
               />
             </motion.div>
           ) : (

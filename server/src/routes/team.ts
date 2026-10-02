@@ -281,6 +281,8 @@ export async function provisionRepNumber(repUserId: string): Promise<string> {
       FriendlyName: `Rep ${repUserId.slice(0, 8)}`,
       VoiceUrl: inboundUrl,
       VoiceMethod: 'POST',
+      SmsUrl: `${PUBLIC_BASE}/api/sms/inbound?rep=${repUserId}`,
+      SmsMethod: 'POST',
       StatusCallbackUrl: `${PUBLIC_BASE}/api/twilio/webhook`,
       StatusCallbackMethod: 'POST',
     }).toString(),
