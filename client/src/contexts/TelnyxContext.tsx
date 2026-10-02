@@ -219,7 +219,12 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
           setPrimaryCallState('active');
           startPrimaryTimer();
           setSipError(null);
-          setActiveCallNumber(incomingCallerNumber || 'Unknown');
+          // Read the number off the call itself, NOT the incomingCallerNumber
+          // state — this handler is registered once by the SDK, so state from
+          // the first closure is stale (always '').
+          setActiveCallNumber(
+            call.options?.callerNumber || call.options?.remoteCallerNumber || 'Unknown'
+          );
 
           // Clear incoming state
           incomingCallRef.current = null;
@@ -255,6 +260,10 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
           setPrimaryCall(call);
           setPrimaryCallState('active');
           setIsHeld(false);
+          // Restore the resumed call's number (was showing the other call's)
+          setActiveCallNumber(
+            call.options?.callerNumber || call.options?.remoteCallerNumber || 'Unknown'
+          );
           return;
         }
 
@@ -309,7 +318,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [primaryCallState, startPrimaryTimer, stopPrimaryTimer, stopHeldTimer, incomingCallerNumber]
+    [primaryCallState, startPrimaryTimer, stopPrimaryTimer, stopHeldTimer]
   );
 
   // ── Connect to Telnyx ──────────────────────────────────────────────
@@ -435,6 +444,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
     setPrimaryCallState('idle');
     setPrimaryCall(null);
     primaryCallRef.current = null;
+    setActiveCallNumber(null);
     setIncomingCall(null);
     incomingCallRef.current = null;
     setHeldCall(null);
@@ -506,10 +516,14 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
   const answerIncoming = useCallback(() => {
     if (incomingCallRef.current) {
       incomingCallRef.current.answer();
-      setActiveCallNumber(incomingCallerNumber || 'Unknown');
+      setActiveCallNumber(
+        incomingCallRef.current.options?.callerNumber ||
+          incomingCallRef.current.options?.remoteCallerNumber ||
+          'Unknown'
+      );
       // State transition handled by notification handler
     }
-  }, [incomingCallerNumber]);
+  }, []);
 
   const rejectIncoming = useCallback(() => {
     if (incomingCallRef.current) {

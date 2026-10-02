@@ -414,6 +414,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     setPrimaryCallState('idle');
     setPrimaryCall(null);
     primaryCallRef.current = null;
+    setActiveCallNumber(null);
     setIncomingCall(null);
     incomingCallRef.current = null;
     setHeldCall(null);
@@ -491,6 +492,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
             'Call could not start after 15s. Most common cause: microphone blocked for this site — click the icon in the address bar and Allow, then reload. If mic is allowed, your network may be blocking Twilio voice (try a phone hotspot).'
           );
           setPrimaryCallState('idle');
+          setActiveCallNumber(null);
         }
       }, 15000);
 
@@ -529,6 +531,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         } catch { /* noop */ }
         setError(`Dial failed: ${syncErr?.message || 'unknown'}`);
         setPrimaryCallState('idle');
+        setActiveCallNumber(null);
         return;
       }
       connectPromise.then((call) => {
@@ -553,6 +556,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         diag('device.connect.rejected', String(err?.message || err).slice(0, 300));
         setError(`Failed to dial: ${err?.message || 'Unknown error'}`);
         setPrimaryCallState('idle');
+        setActiveCallNumber(null);
       });
     },
     [connectionStatus, attachCallListeners]
