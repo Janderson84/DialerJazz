@@ -5,6 +5,11 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Vite 8 (rolldown) bug: pre-bundled CJS deps import './react.js' WITHOUT the
+  // browserHash query, so the browser loads a SECOND react instance and hooks
+  // crash with 'Cannot read properties of null (reading useRef)'. Exclude react
+  // core from pre-bundling — esm react has no interop layer, every importer then
+  // resolves the same real module file and the duplicate-instance problem is gone.
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

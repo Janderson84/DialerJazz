@@ -126,6 +126,11 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
 
   // Held call state (first call put on hold)
   const heldCallRef = useRef<Call | null>(null);
+  // Mirrored duration + call metadata for use inside SDK callbacks (state reads go stale there)
+  const primaryDurationRef = useRef(0);
+  // dial() sets direction 'outbound'; answering an incoming call sets 'inbound'.
+  // CampaignDialerPage passes { autoLog: false } and logs its own lead-aware call.
+  const callMetaRef = useRef<{ direction: 'outbound' | 'inbound'; to_number?: string; from_number?: string } | null>(null);
   const [heldCall, setHeldCall] = useState<Call | null>(null);
   const [heldCallDuration, setHeldCallDuration] = useState(0);
   const [heldCallerNumber, setHeldCallerNumber] = useState('');
@@ -229,6 +234,10 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
           setActiveCallNumber(
             call.options?.callerNumber || call.options?.remoteCallerNumber || 'Unknown'
           );
+          callMetaRef.current = {
+            direction: 'inbound',
+            from_number: call.options?.callerNumber || call.options?.remoteCallerNumber || '',
+          };
 
           // Clear incoming state
           incomingCallRef.current = null;
@@ -314,6 +323,28 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
         setIsHeld(false);
         setActiveCallRoute(null); // Clear so ActiveCallBubble hides
         setActiveCallNumber(null);
+
+        // Auto-log leadless calls (manual dialer / inbound) — parity with
+        // TwilioContext. Campaign calls log themselves with lead_id.
+        const meta = callMetaRef.current;
+        callMetaRef.current = null;
+        const duration = primaryDurationRef.current;
+        if (meta && duration > 0) {
+          const payload = {
+            lead_id: null,
+            campaign_id: null,
+            duration_seconds: duration,
+            status: 'completed',
+            disposition: meta.direction === 'inbound' ? 'inbound_call' : 'manual_call',
+            notes: meta.direction === 'inbound' ? 'Inbound call' : 'Manual out-of-band call',
+            provider: 'telnyx' as const,
+            direction: meta.direction,
+            to_number: meta.to_number || null,
+            from_number: meta.from_number || null,
+          };
+          console.log('[TelnyxContext] Auto-logging call:', payload);
+          callsApi.log(payload).catch((err) => console.error('[TelnyxContext] Auto-log failed:', err));
+        }
 
         if (call.sipReason) {
           setSipError(`Call Failed: ${call.sipReason}`);
@@ -682,39 +713,3 @@ export function useTelnyxContext(): TelnyxContextValue {
   }
   return ctx;
 }
-  // Mirrored duration for use inside the notification handler (state reads go stale there)
-  const primaryDurationRef = useRef(0);
-  // Metadata of the current/last call for auto-logging on end. dial() sets
-  // direction 'outbound'; answering an incoming call sets 'inbound'.
-  // CampaignDialerPage passes { autoLog: false } and logs its own lead-aware call.
-  const callMetaRef = useRef<{ direction: 'outbound' | 'inbound'; to_number?: string; from_number?: string } | null>(null);
-  // Ref mirror of incomingCallerNumber — state reads inside callbacks go stale.
-  const incomingCallerNumberRef = useRef('');
-          incomingCallerNumberRef.current = call.options?.callerNumber || call.options?.remoteCallerNumber || 'Unknown';
-          callMetaRef.current = {
-            direction: 'inbound',
-            from_number: incomingCallerNumberRef.current || call.options?.callerNumber || '',
-          };
-          primaryDurationRef.current = 0;
-
-        // Auto-log leadless calls (manual dialer / inbound) — parity with
-        // TwilioContext. Campaign calls log themselves with lead_id.
-        const meta = callMetaRef.current;
-        callMetaRef.current = null;
-        const duration = primaryDurationRef.current;
-        if (meta && duration > 0) {
-          const payload = {
-            lead_id: null,
-            campaign_id: null,
-            duration_seconds: duration,
-            status: 'completed',
-            disposition: meta.direction === 'inbound' ? 'inbound_call' : 'manual_call',
-            notes: meta.direction === 'inbound' ? 'Inbound call' : 'Manual out-of-band call',
-            provider: 'telnyx' as const,
-            direction: meta.direction,
-            to_number: meta.to_number || null,
-            from_number: meta.from_number || null,
-          };
-          console.log('[TelnyxContext] Auto-logging call:', payload);
-          callsApi.log(payload).catch((err) => console.error('[TelnyxContext] Auto-log failed:', err));
-        }
