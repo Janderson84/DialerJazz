@@ -210,10 +210,10 @@ export default function CampaignDialerPage() {
       toast.success(`Marked as ${dispositionLabel}`);
       setShowDisposition(false);
 
-      // Offer a post-call text before advancing (power dialer advances after
-      // the overlay is dismissed; click-to-call just shows the overlay).
+      // Offer a post-call text before advancing. Dismissing the overlay ALWAYS
+      // moves to the next lead (both power + click mode); only power mode
+      // additionally auto-dials the next lead.
       const advance = () => {
-        if (dialerSessionMode !== 'power') return;
         const isLast = currentIndex >= leads.length - 1;
         if (isLast) {
           toast.success('All leads dialed! 🎉');
@@ -224,7 +224,11 @@ export default function CampaignDialerPage() {
             await triggerSwipeLeft();
             setTimeout(() => {
               const next = leads[currentIndex + 1];
-              if (next && !['trying', 'ringing', 'active'].includes(voice.primaryCallState)) {
+              if (
+                next &&
+                dialerSessionMode === 'power' &&
+                !['trying', 'ringing', 'active'].includes(voice.primaryCallState)
+              ) {
                 handleDialForLead(next);
               }
             }, 1200);
@@ -235,7 +239,7 @@ export default function CampaignDialerPage() {
       const lead = currentLead;
       const leadName = `${lead.first_name} ${lead.last_name || ''}`.trim() || lead.phone;
       setPendingSmsLead({ id: lead.id, name: leadName, phone: lead.phone });
-      smsThenAdvanceRef.current = dialerSessionMode === 'power' ? advance : null;
+      smsThenAdvanceRef.current = advance;
       setShowSmsAfterCall(true);
 
     } catch (err: unknown) {
