@@ -364,8 +364,8 @@ router.patch('/threads/:peer/status', requireAuth, async (req: AuthenticatedRequ
     const admin = await adminFetch();
     // outbound to this peer OR inbound from this peer
     for (const q of [
-      `to_number=eq.${peer}`,
-      `from_number=eq.${peer}`,
+      `to_number=eq.${encodeURIComponent(peer)}`,
+      `from_number=eq.${encodeURIComponent(peer)}`,
     ]) {
       await fetch(
         `${admin.base}/api/database/records/sms_messages?user_id=eq.${req.user!.id}&${q}`,
@@ -607,7 +607,7 @@ router.post('/inbound', (req: Request, res: Response) => {
       // 2. Cancel scheduled outbound messages to this contact (Quo-style:
       //    reply-first cancels the scheduled send)
       await fetch(
-        `${admin.base}/api/database/records/sms_messages?user_id=eq.${ownerId}&to_number=eq.${from}&status=eq.scheduled`,
+        `${admin.base}/api/database/records/sms_messages?user_id=eq.${ownerId}&to_number=eq.${encodeURIComponent(from)}&status=eq.scheduled`,
         { method: 'PATCH', headers: admin.headers(), body: JSON.stringify({ status: 'cancelled' }) }
       );
 
