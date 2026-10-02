@@ -62,6 +62,9 @@ export interface VoiceContextValue {
   activeCallRoute: string | null;
   setActiveCallRoute: (route: string | null) => void;
 
+  // Remote party of the active/last primary call
+  activeCallNumber: string | null;
+
   // Errors & metrics
   error: string | null;
   sipError: string | null;
@@ -158,6 +161,7 @@ export function VoiceContextProvider({ children }: { children: ReactNode }) {
     // Navigation
     activeCallRoute: active.activeCallRoute,
     setActiveCallRoute: active.setActiveCallRoute,
+    activeCallNumber: active.activeCallNumber,
 
     // Errors
     error: active.error,

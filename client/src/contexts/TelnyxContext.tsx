@@ -83,6 +83,9 @@ export interface TelnyxContextValue {
   activeCallRoute: string | null;
   setActiveCallRoute: (route: string | null) => void;
 
+  // Remote party of the active/last primary call
+  activeCallNumber: string | null;
+
   // Errors
   error: string | null;
   sipError: string | null;
@@ -134,6 +137,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
 
   // Navigation — where was the user when a call started
   const [activeCallRoute, setActiveCallRoute] = useState<string | null>(null);
+  const [activeCallNumber, setActiveCallNumber] = useState<string | null>(null);
 
   // ── Timer helpers ──────────────────────────────────────────────────
   const startPrimaryTimer = useCallback(() => {
@@ -295,6 +299,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
         setIsMuted(false);
         setIsHeld(false);
         setActiveCallRoute(null); // Clear so ActiveCallBubble hides
+        setActiveCallNumber(null);
 
         if (call.sipReason) {
           setSipError(`Call Failed: ${call.sipReason}`);
@@ -464,6 +469,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
       setError(null);
       setSipError(null);
       setPrimaryCallState('trying');
+      setActiveCallNumber(destinationNumber);
       setIsMuted(false);
       setIsHeld(false);
       setPrimaryCallDuration(0);
@@ -493,6 +499,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
     setIsMuted(false);
     setIsHeld(false);
     setActiveCallRoute(null);
+    setActiveCallNumber(null);
   }, [stopPrimaryTimer]);
 
   const answerIncoming = useCallback(() => {
@@ -627,6 +634,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
 
     activeCallRoute,
     setActiveCallRoute,
+    activeCallNumber,
   };
 
   return (

@@ -113,6 +113,7 @@ export default function ManualDialerPage() {
                  <input 
                    value={numberInput}
                    onChange={(e) => setNumberInput(e.target.value)}
+                   onKeyDown={(e) => { if (e.key === 'Enter' && !isInCall) handleDial(); }}
                    className="text-3xl font-mono text-center font-bold tracking-wider text-foreground bg-transparent w-full outline-none placeholder:text-muted-foreground/30"
                    placeholder="(555) 000-0000"
                    disabled={isInCall}

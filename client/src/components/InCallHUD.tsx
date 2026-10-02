@@ -6,6 +6,7 @@ import type { CallState } from '@/contexts/TelnyxContext';
 interface InCallHUDProps {
   callState: CallState;
   callDuration: number;
+  callNumber?: string | null;
   remoteStream: MediaStream | null;
   showDTMF: boolean;
   onSendDTMF: (key: string) => void;
@@ -24,6 +25,7 @@ const CALL_STATE_LABELS: Record<string, string> = {
 export default function InCallHUD({
   callState,
   callDuration,
+  callNumber,
   remoteStream,
   showDTMF,
   onSendDTMF,
@@ -46,6 +48,12 @@ export default function InCallHUD({
           <span className="text-sm font-bold tracking-widest uppercase text-muted-foreground mb-1">
             {CALL_STATE_LABELS[callState] || callState}
           </span>
+          {callNumber ? (
+            <span className="text-base font-mono font-semibold text-foreground/80 tabular-nums mb-3">
+              {callNumber}
+            </span>
+          ) : null}
+
           <span className="text-5xl font-extrabold text-foreground tabular-nums tracking-tighter mb-6">
             {minutes}:{seconds}
           </span>
