@@ -15,7 +15,7 @@ import { getInsforgeClient } from '../lib/insforge.js';
 import { MASTER_ID, getMasterSettingsField } from '../lib/masterSettings.js';
 
 const router = Router();
-const PD_BASE = 'https://api.pipedrive.com/api/v1';
+const PD_BASE = 'https://api.pipedrive.com/v1';
 
 // ── token helper ────────────────────────────────────────────────────
 export async function getPipedriveToken(req?: AuthenticatedRequest): Promise<string> {
@@ -29,7 +29,9 @@ export async function getPipedriveToken(req?: AuthenticatedRequest): Promise<str
 async function pdGet(token: string, path: string, params: Record<string, string | number> = {}): Promise<any> {
   const url = new URL(`${PD_BASE}${path}`);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
-  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
+  // api_token auth: Pipedrive API tokens only work as a query param (Bearer is for OAuth)
+  url.searchParams.set('api_token', token);
+  const res = await fetch(url.toString());
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
     throw new ApiError(502, `Pipedrive API error (${res.status}): ${txt.slice(0, 200)}`, 'pd_api_error');
@@ -41,9 +43,12 @@ async function pdGet(token: string, path: string, params: Record<string, string 
 
 /** Pipedrive POST/PUT with the token in the Authorization header. */
 async function pdPost(token: string, path: string, body: Record<string, unknown>, method = 'POST'): Promise<any> {
-  const res = await fetch(`${PD_BASE}${path}`, {
+  // api_token auth via query param (Bearer is OAuth-only)
+  const url = new URL(`${PD_BASE}${path}`);
+  url.searchParams.set('api_token', token);
+  const res = await fetch(url.toString(), {
     method,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -242,12 +247,14 @@ export async function pushPdCallActivity(
     rep_email?: string;
     duplicates?: number[];
     pd_user_id?: number | null;
+    phone?: string; // included in note when no PD person matched
   }
 ): Promise<{ activity_id: number | null }> {
   const when = new Date().toISOString().slice(0, 16).replace('T', ' ');
   const note = [
     `Cold Call Machine: ${opts.disposition}${opts.direction === 'inbound' ? ' (inbound)' : ''}`,
     opts.duration_secs ? `Duration: ${Math.floor(opts.duration_secs / 60)}m ${opts.duration_secs % 60}s` : '',
+    opts.phone ? `Number: ${opts.phone}` : '',
     opts.deal_id && opts.duplicates?.length ? `Other open deals: ${opts.duplicates.join(', ')}` : '',
     opts.notes ? `Notes: ${opts.notes}` : '',
     opts.rep_name ? `Rep: ${opts.rep_name}` : '',
@@ -265,6 +272,49 @@ export async function pushPdCallActivity(
     ...(opts.pd_user_id ? { user_id: opts.pd_user_id } : {}),
   });
   return { activity_id: activity?.id ?? null };
+}
+
+/**
+ * Create a Pipedrive person for a contact we called but couldn't match.
+ * James's rule: every call gets an activity attached to a prospect — so an
+ * unmatched number becomes a new person (name from the lead when known,
+ * phone-only fallback for manual dials). Idempotent-ish: re-checks the phone
+ * right before creating to avoid duplicates from parallel calls.
+ */
+export async function createPdPersonIfMissing(
+  token: string,
+  opts: { phone: string; name?: string; company?: string; email?: string }
+): Promise<number | null> {
+  if (!opts.phone?.replace(/\D/g, '')) return null;
+  // Re-check: another call may have created this person milliseconds ago
+  const existing = await resolvePdByPhone(token, opts.phone);
+  if (existing.matched) return existing.person_id;
+  const body: Record<string, unknown> = {
+    name: opts.name?.trim() || opts.phone,
+    phone: [{ value: opts.phone, primary: true }],
+  };
+  if (opts.email?.includes('@')) body.email = [{ value: opts.email, primary: true }];
+  // org must be referenced by id — resolve by name, create if new
+  if (opts.company?.trim()) {
+    try {
+      const found = await pdGet(token, '/organizations/find', { term: opts.company.trim(), limit: 1 });
+      const org = Array.isArray(found) ? found[0] : found?.items?.[0]?.item || null;
+      if (org?.id) body.org_id = org.id;
+      else {
+        const created = await pdPost(token, '/organizations', { name: opts.company.trim() });
+        if (created?.id) body.org_id = created.id;
+      }
+    } catch (e: any) {
+      console.warn('[pipedrive] org resolve failed (continuing without):', e?.message || e);
+    }
+  }
+  try {
+    const person = await pdPost(token, '/persons', body);
+    return person?.id ?? null;
+  } catch (e: any) {
+    console.warn('[pipedrive] person create failed:', e?.message || e);
+    return null;
+  }
 }
 
 /** Normalize a phone to digits with optional leading + (compare on last 10 digits). */
@@ -301,7 +351,17 @@ export async function resolvePdByPhone(
     person = null;
   }
   if (!person?.id) {
-    // Cheap fallback: scan the first 100 persons and compare digits.
+    // Middle fallback: PD's global search indexes phones reliably even when
+    // /persons/find misses (observed 2026-10-03: find returned 0 for an
+    // existing person; searchResults found them).
+    try {
+      const sr = await pdGet(token, '/searchResults', { term: phone, itemType: 'person', limit: 5 });
+      const hit = (Array.isArray(sr) ? sr : sr?.items || []).map((r: any) => r.item || r).find((x: any) => x?.id);
+      if (hit) person = hit;
+    } catch { /* continue to scan */ }
+  }
+  if (!person?.id) {
+    // Last resort: scan recent persons and compare digits.
     // When both sides are E.164 (leading +), require an EXACT match — a
     // last-10-digits match on international numbers can hit the wrong person.
     try {

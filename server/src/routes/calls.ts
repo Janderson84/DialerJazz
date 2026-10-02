@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import { getPipedriveToken, resolvePdByPhone, pushPdCallActivity, resolvePdUserId } from './pipedrive.js';
+import { getPipedriveToken, resolvePdByPhone, pushPdCallActivity, resolvePdUserId, createPdPersonIfMissing } from './pipedrive.js';
 
 const router = Router();
 
@@ -61,13 +61,29 @@ router.post('/log', requireAuth, async (req: AuthenticatedRequest, res, next) =>
 
     console.log('[calls/log] Inserted log:', logData);
 
-    // ── Pipedrive push (manual / inbound path only — best-effort, non-fatal).
-    // Campaign calls (lead_id set) are pushed via POST /api/pipedrive/log-call
-    // with the deal id known; here we resolve phone → person/deal server-side.
-    // Never blocks or fails the call log: no token / no match / PD error all
-    // return 200 with a `pipedrive` status field.
+    // ── Pipedrive push (best-effort, non-fatal).
+    // EVERY logged call should land in Pipedrive as a done call activity with
+    // per-rep attribution (user_id = rep's Pipedrive owner via email match).
+    // For campaign calls (lead_id set) the phone comes from the lead record;
+    // for manual calls the client sends to/from. Never blocks or fails the
+    // call log: no token / no match / PD error all return 200 with a
+    // `pipedrive` status field.
     let pdResult: unknown = null;
-    if (!validated.lead_id && (validated.to_number || validated.from_number)) {
+    {
+      // Campaign path: resolve the phone from the lead record
+      if (validated.lead_id && !validated.to_number && !validated.from_number) {
+        try {
+          const { data: leadRow } = await req.db!.database
+            .from('leads')
+            .select('phone')
+            .eq('id', validated.lead_id)
+            .eq('user_id', userId)
+            .single();
+          if (leadRow?.phone) validated.to_number = leadRow.phone;
+        } catch { /* non-fatal */ }
+      }
+    }
+    if (validated.to_number || validated.from_number) {
       try {
         const phone = validated.direction === 'inbound'
           ? (validated.from_number || '')
@@ -78,24 +94,56 @@ router.post('/log', requireAuth, async (req: AuthenticatedRequest, res, next) =>
         } else {
           const token = await getPipedriveToken(req);
           const pdUserId = await resolvePdUserId(req, token);
-          const match = await resolvePdByPhone(token, phone);
-          if (match.matched) {
-            pdResult = await pushPdCallActivity(token, {
-              deal_id: match.deal_id,
-              person_id: match.person_id,
-              direction: validated.direction,
-              disposition: validated.disposition || 'call',
-              duration_secs: validated.duration_seconds,
-              notes: validated.notes || undefined,
-              rep_name: req.user?.name,
-              rep_email: req.user?.email,
-              pd_user_id: pdUserId,
-              duplicates: match.duplicates,
+          let match = await resolvePdByPhone(token, phone);
+          // Every call must land as an activity on a prospect (per James).
+          // Unmatched number → create the Pipedrive person from the lead
+          // record (name/company when known, phone-only fallback), then log
+          // the call activity against them.
+          let personId: number | null = match.matched ? match.person_id : null;
+          if (!match.matched) {
+            let leadInfo: { first_name?: string; last_name?: string; company?: string; email?: string } = {};
+            if (validated.lead_id) {
+              try {
+                const { data: leadRow } = await req.db!.database
+                  .from('leads')
+                  .select('first_name,last_name,company,email')
+                  .eq('id', validated.lead_id)
+                  .eq('user_id', userId)
+                  .single();
+                leadInfo = (leadRow as any) || {};
+              } catch { /* non-fatal */ }
+            }
+            const createdId = await createPdPersonIfMissing(token, {
+              phone,
+              name: [leadInfo.first_name, leadInfo.last_name].filter(Boolean).join(' ') || undefined,
+              company: leadInfo.company || undefined,
+              email: leadInfo.email || undefined,
             });
-            pdResult = { ...(pdResult as any), person_name: match.person_name, deal_title: match.deal_title };
-          } else {
-            pdResult = { matched: false };
+            if (createdId) {
+              personId = createdId;
+              match = { matched: true, person_id: createdId, person_name: leadInfo.first_name ? [leadInfo.first_name, leadInfo.last_name].filter(Boolean).join(' ') : phone, deal_id: null, deal_title: null, duplicates: [] };
+            }
           }
+          // Push an activity for EVERY call (per James: N calls = N activities).
+          const act = await pushPdCallActivity(token, {
+            deal_id: match.matched ? match.deal_id : null,
+            person_id: personId,
+            direction: validated.direction,
+            disposition: validated.disposition || 'call',
+            duration_secs: validated.duration_seconds,
+            notes: validated.notes || undefined,
+            rep_name: req.user?.name,
+            rep_email: req.user?.email,
+            pd_user_id: pdUserId,
+            duplicates: match.matched ? (match.duplicates || []) : [],
+            phone,
+          });
+          pdResult = {
+            ...(act as any),
+            matched: match.matched,
+            person_created: !match.matched ? false : undefined,
+            ...(match.matched ? { person_name: match.person_name, deal_title: match.deal_title } : {}),
+          };
         }
       } catch (e: any) {
         console.warn('[calls/log] Pipedrive push skipped:', e?.message || e);
