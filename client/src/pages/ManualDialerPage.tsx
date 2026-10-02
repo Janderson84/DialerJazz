@@ -38,7 +38,7 @@ export default function ManualDialerPage() {
     protocolRegisteredRef.current = true;
     try {
       if ('registerProtocolHandler' in navigator) {
-        navigator.registerProtocolHandler?.('tel', `${window.location.origin}/dialer?tel=%s`, 'DialerJazz');
+        (navigator as Navigator & { registerProtocolHandler?: (scheme: string, url: string, title?: string) => void }).registerProtocolHandler?.('tel', `${window.location.origin}/dialer?tel=%s`, 'DialerJazz');
       }
     } catch (err) {
       // Unsupported (Safari/Firefox) or permission denied — manual dialing still works.

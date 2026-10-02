@@ -2,7 +2,6 @@ import {
   LayoutDashboard,
   Target,
   Users,
-  PhoneCall,
   ScrollText,
   Plug,
   Phone,

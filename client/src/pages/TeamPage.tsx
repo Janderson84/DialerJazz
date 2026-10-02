@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Users, UserPlus, Phone, PhoneCall, Clock, Target, Trash2,
   Loader2, AlertCircle, CheckCircle2, XCircle,
@@ -9,7 +8,6 @@ import { teamApi, type TeamMember } from '@/lib/team';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 export default function TeamPage() {
-  const navigate = useNavigate();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

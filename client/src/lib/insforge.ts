@@ -1,6 +1,5 @@
 import { createClient } from '@insforge/sdk';
 
-const rawBase = import.meta.env.VITE_INSFORGE_BASE_URL || 'https://755d753k.ap-southeast.insforge.app';
 // The InsForge SDK builds URLs with `new URL('/api/...', baseUrl)` — an absolute
 // path DISCARDS any base-path prefix, so the SDK's calls always land on
 // `${origin}/api/*`. The public preview tunnel's edge blocks the /api/auth

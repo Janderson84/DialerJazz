@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Plug, CheckCircle2, XCircle, ArrowRight, Smartphone } from 'lucide-react';
 import { settingsApi, apiFetch } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import type { UserSettings } from '@/lib/api';
 import Select from '@/components/ui/select';
 
 const MASTER_USER_ID_CLIENT = 'a4d41720-59e1-4850-8b15-e8841872e702';
 
 export default function ConnectorsPage() {
+  const { user } = useAuth();
 
   // ── Pipedrive ──
   const isMaster = user?.id === MASTER_USER_ID_CLIENT;
@@ -15,7 +17,7 @@ export default function ConnectorsPage() {
   const [pdConnecting, setPdConnecting] = useState(false);
   const [pdStatus, setPdStatus] = useState<{ connected: boolean }>({ connected: false });
   useEffect(() => {
-    apiFetch<{ data: { connected: boolean } }>('/pipedrive/status', { method: 'GET' })
+    apiFetch<{ connected: boolean }>('/pipedrive/status', { method: 'GET' })
       .then((r) => setPdStatus({ connected: r.data.connected }))
       .catch(() => setPdStatus({ connected: false }));
   }, []);
@@ -23,7 +25,7 @@ export default function ConnectorsPage() {
     setPdConnecting(true);
     try {
       await apiFetch('/pipedrive/token', { method: 'POST', body: JSON.stringify({ api_token: pdToken }) });
-      const r = await apiFetch<{ data: { connected: boolean } }>('/pipedrive/status', { method: 'GET' });
+      const r = await apiFetch<{ connected: boolean }>('/pipedrive/status', { method: 'GET' });
       setPdStatus({ connected: r.data.connected });
       setPdToken('');
     } catch (e: any) {
@@ -33,7 +35,7 @@ export default function ConnectorsPage() {
     }
   };
 
-  const { user } = useAuth();  const [settings, setSettings] = useState<UserSettings | null>(null);
+  const [settings, setSettings] = useState<UserSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   // Telnyx Modal State
