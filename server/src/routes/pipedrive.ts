@@ -25,12 +25,11 @@ export async function getPipedriveToken(req?: AuthenticatedRequest): Promise<str
   throw new ApiError(400, 'Pipedrive not connected. Ask James to add the API token in Connectors.', 'pd_no_token');
 }
 
-/** Pipedrive GET with api_token param. */
+/** Pipedrive GET with the token in the Authorization header (keeps it out of URL query / access logs). */
 async function pdGet(token: string, path: string, params: Record<string, string | number> = {}): Promise<any> {
   const url = new URL(`${PD_BASE}${path}`);
-  url.searchParams.set('api_token', token);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
     const txt = await res.text().catch(() => '');
     throw new ApiError(502, `Pipedrive API error (${res.status}): ${txt.slice(0, 200)}`, 'pd_api_error');
@@ -40,11 +39,11 @@ async function pdGet(token: string, path: string, params: Record<string, string 
   return json.data;
 }
 
-/** Pipedrive POST/PUT. */
+/** Pipedrive POST/PUT with the token in the Authorization header. */
 async function pdPost(token: string, path: string, body: Record<string, unknown>, method = 'POST'): Promise<any> {
-  const res = await fetch(`${PD_BASE}${path}?api_token=${encodeURIComponent(token)}`, {
+  const res = await fetch(`${PD_BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -302,12 +301,19 @@ export async function resolvePdByPhone(
     person = null;
   }
   if (!person?.id) {
-    // Cheap fallback: scan the first 100 persons and compare digits
+    // Cheap fallback: scan the first 100 persons and compare digits.
+    // When both sides are E.164 (leading +), require an EXACT match — a
+    // last-10-digits match on international numbers can hit the wrong person.
     try {
       const all = await pdGet(token, '/persons', { limit: 100 });
       const digits = last10(phone);
+      const isE164 = phone.startsWith('+');
       person = (all as any[]).find((p) =>
-        (p.phone || []).some((ph: any) => last10(ph?.value || '') === digits)
+        (p.phone || []).some((ph: any) => {
+          const v = ph?.value || '';
+          if (isE164 && v.replace(/\s/g, '').startsWith('+')) return v.replace(/[^\d+]/g, '') === phone;
+          return last10(v) === digits;
+        })
       ) || null;
     } catch {
       return { matched: false };
