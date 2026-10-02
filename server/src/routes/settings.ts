@@ -2,6 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import { getMasterTwilioSettings } from '../lib/masterSettings.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -33,7 +34,29 @@ router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunct
 
     if (error) throw new ApiError(500, error.message, 'db_error');
 
-    res.json({ data: data || {} });
+    let settings: Record<string, any> = data || {};
+
+    // Reps dial through the MASTER's Twilio account (agreed design: one master
+    // token, per-rep numbers via Team). If the rep has no Twilio creds of their
+    // own, inherit the master's so the client-side gate passes. Reps never see
+    // or enter credentials — they just get dialing that works.
+    const needsTwilio = !settings.twilio_account_sid || !settings.twilio_api_key;
+    if (needsTwilio) {
+      const master = await getMasterTwilioSettings();
+      if (master?.twilio_account_sid && master?.twilio_api_key) {
+        settings = {
+          ...settings,
+          twilio_account_sid: master.twilio_account_sid,
+          twilio_auth_token: settings.twilio_auth_token || master.twilio_auth_token,
+          twilio_api_key: master.twilio_api_key,
+          twilio_api_secret: settings.twilio_api_secret || master.twilio_api_secret,
+          twilio_twiml_app_sid: settings.twilio_twiml_app_sid || master.twilio_twiml_app_sid,
+          twilio_caller_number: settings.twilio_caller_number || master.twilio_caller_number,
+        };
+      }
+    }
+
+    res.json({ data: settings });
   } catch (error) {
     next(error);
   }
