@@ -484,6 +484,60 @@ router.delete('/auto-replies/:id', requireAuth, async (req: AuthenticatedRequest
   } catch (e) { next(e); }
 });
 
+// ══ Auto-reply firing (shared with Twilio dial-action for missed calls) ══
+export async function fireAutoReplies(opts: {
+  userId: string;
+  triggerEvent: 'inbound_text' | 'missed_call' | 'voicemail';
+  fromNumber: string; // the contact (message goes TO them)
+  repNumber: string;  // our rep number the message comes FROM
+}): Promise<void> {
+  try {
+    const admin = await adminFetch();
+    const arRes = await fetch(
+      `${admin.base}/api/database/records/sms_auto_replies?user_id=eq.${opts.userId}&trigger_event=eq.${opts.triggerEvent}&active=eq.true`,
+      { headers: admin.headers() }
+    );
+    if (!arRes.ok) return;
+    const arRows = (await arRes.json()) || [];
+    const rules = (Array.isArray(arRows) ? arRows : arRows?.data || []) as any[];
+    const nowHour = Number(
+      new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Chicago' }).format(new Date())
+    );
+    for (const rule of rules) {
+      const { start, end } = rule.business_hours || { start: '9', end: '17' };
+      const inHours = nowHour >= Number(start) && nowHour < Number(end);
+      if (rule.schedule_mode === 'business_hours' && !inHours) continue;
+      if (rule.schedule_mode === 'after_hours' && inHours) continue;
+      const rendered = rule.body
+        .replace(/\{\{\s*first_name\s*\}\}/gi, '')
+        .trim();
+      if (!rendered) continue;
+      const { sid, token } = await twilioCreds();
+      const twRes = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
+        method: 'POST',
+        headers: {
+          Authorization: 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'),
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({ From: opts.repNumber, To: opts.fromNumber, Body: rendered }).toString(),
+      });
+      const twJson = await twRes.json().catch(() => null);
+      if (twRes.ok) {
+        await fetch(`${admin.base}/api/database/records/sms_messages`, {
+          method: 'POST',
+          headers: admin.headers(),
+          body: JSON.stringify({
+            user_id: opts.userId, direction: 'outbound', from_number: opts.repNumber, to_number: opts.fromNumber,
+            body: rendered, status: twJson?.status || 'sent', twilio_sid: twJson?.sid,
+          }),
+        });
+      }
+    }
+  } catch (e) {
+    console.error('[sms/auto-reply] fire error:', e);
+  }
+}
+
 // ══ Inbound SMS webhook (Twilio) ════════════════════════════════════
 // Wire each rep number's SmsUrl to PUBLIC_BASE/api/sms/inbound?rep=<repUserId>
 // Rep lookup is by the rep query param (same pattern as voice inbound).
@@ -535,46 +589,7 @@ router.post('/inbound', (req: Request, res: Response) => {
       );
 
       // 3. Fire matching auto-replies (inbound_text trigger, hours-aware)
-      const arRes = await fetch(
-        `${admin.base}/api/database/records/sms_auto_replies?user_id=eq.${ownerId}&trigger_event=eq.inbound_text&active=eq.true`,
-        { headers: admin.headers() }
-      );
-      if (arRes.ok) {
-        const arRows = (await arRes.json()) || [];
-        const rules = (Array.isArray(arRows) ? arRows : arRows?.data || []) as any[];
-        const nowHour = Number(
-          new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Chicago' }).format(new Date())
-        );
-        for (const rule of rules) {
-          const { start, end } = rule.business_hours || { start: '9', end: '17' };
-          const inHours = nowHour >= Number(start) && nowHour < Number(end);
-          if (rule.schedule_mode === 'business_hours' && !inHours) continue;
-          if (rule.schedule_mode === 'after_hours' && inHours) continue;
-          const rendered = rule.body
-            .replace(/\{\{\s*first_name\s*\}\}/gi, '')
-            .trim();
-          const { sid, token } = await twilioCreds();
-          const twRes = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
-            method: 'POST',
-            headers: {
-              Authorization: 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'),
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({ From: to, To: from, Body: rendered }).toString(),
-          });
-          const twJson = await twRes.json().catch(() => null);
-          if (twRes.ok) {
-            await fetch(`${admin.base}/api/database/records/sms_messages`, {
-              method: 'POST',
-              headers: admin.headers(),
-              body: JSON.stringify({
-                user_id: ownerId, direction: 'outbound', from_number: to, to_number: from,
-                body: rendered, status: twJson?.status || 'sent', twilio_sid: twJson?.sid,
-              }),
-            });
-          }
-        }
-      }
+      await fireAutoReplies({ userId: ownerId, triggerEvent: 'inbound_text', fromNumber: from, repNumber: to });
 
       // TwiML: empty response = no further action
       const twiml = new twilio.twiml.MessagingResponse();

@@ -3,6 +3,7 @@ import twilio from 'twilio';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
+import { fireAutoReplies } from './sms.js';
 
 const PUBLIC_BASE_URL = () =>
   process.env.PUBLIC_BASE_URL || 'https://2c3de6c6d1ba--5173.jackhamr.app';
@@ -122,7 +123,7 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req: Req
       console.log('[Twilio Inbound] invalid rep id, falling back to master');
     }
 
-    const dial = twiml.dial({ callerId: from, timeout: 25 });
+    const dial = twiml.dial({ callerId: from, timeout: 25, action: `${PUBLIC_BASE_URL()}/api/twilio/dial-status?rep=${repId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(req.body.To || '')}`, method: 'POST' });
     dial.client(targetClient);
     // If the rep doesn't answer, take a voicemail
     twiml.say('The person you are calling is unavailable. Please leave a message after the tone.');
@@ -131,6 +132,36 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req: Req
   } catch (err) {
     console.error('[Twilio Inbound] Error:', err);
     res.status(500).type('text/xml').send('<Response><Say>An error occurred.</Say></Response>');
+  }
+});
+
+// ── POST /api/twilio/dial-status ───────────────────────────────────
+// Dial action callback: fires when the inbound call to a rep's browser
+// ends or times out. DialCallStatus = completed | busy | no-answer |
+// canceled. Anything but completed = missed call -> fire auto-replies
+// and take a voicemail.
+router.post('/dial-status', express.urlencoded({ extended: false }), async (req: Request, res: Response) => {
+  try {
+    const repId = (req.query.rep as string) || '';
+    const from = (req.query.from as string) || req.body.From || '';
+    const to = (req.query.to as string) || req.body.To || req.body.Called || '';
+    const status = req.body.DialCallStatus || 'unknown';
+    console.log(`[Twilio dial-status] rep=${repId} from=${from} status=${status}`);
+
+    if (status !== 'completed' && from && to) {
+      // missed call — auto-replies fire from OUR number (to) to the contact (from)
+      const ownerId = /^[0-9a-f-]{36}$/.test(repId) ? repId : MASTER_ID();
+      fireAutoReplies({ userId: ownerId, triggerEvent: 'missed_call', fromNumber: from, repNumber: to })
+        .catch((e) => console.error('[dial-status] auto-reply error:', e));
+    }
+
+    // Continue the original TwiML flow: take a voicemail
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say('The person you are calling is unavailable. Please leave a message after the tone.');
+    res.type('text/xml').send(twiml.toString());
+  } catch (err) {
+    console.error('[Twilio dial-status] error:', err);
+    res.status(200).type('text/xml').send('<Response/>');
   }
 });
 
