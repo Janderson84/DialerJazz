@@ -12,7 +12,7 @@ import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
 
 const router = Router();
 
-const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || 'https://2c3de6c6d1ba--5173.jackhamr.app';
+const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || 'https://3a50c7f3047f--3001.jackhamr.app';
 
 // ── Storage: one file per user at a time (replaced on upload) ───────
 const VOICEMAIL_DIR = path.join(process.cwd(), 'uploads', 'voicemail');

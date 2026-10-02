@@ -6,7 +6,7 @@ import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
 import { fireAutoReplies } from './sms.js';
 
 const PUBLIC_BASE_URL = () =>
-  process.env.PUBLIC_BASE_URL || 'https://2c3de6c6d1ba--5173.jackhamr.app';
+  process.env.PUBLIC_BASE_URL || 'https://3a50c7f3047f--3001.jackhamr.app';
 
 const router = Router();
 const { AccessToken } = twilio.jwt;

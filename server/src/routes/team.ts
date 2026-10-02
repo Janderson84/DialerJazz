@@ -242,7 +242,7 @@ function db(req: AuthenticatedRequest) { return req.db!; }
 
 
 // ── Twilio number provisioning ──────────────────────────────────────
-const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || 'https://2c3de6c6d1ba--5173.jackhamr.app';
+const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || 'https://3a50c7f3047f--3001.jackhamr.app';
 
 /** Twilio credentials for the master account (never exposed to reps). */
 async function twilioCreds(): Promise<{ sid: string; token: string }> {
