@@ -33,6 +33,21 @@ router.post('/log', requireAuth, async (req: AuthenticatedRequest, res, next) =>
 
     console.log('[calls/log] Validated data:', validated);
 
+    // Resolve the dialed number for campaign calls (lead record) BEFORE the
+    // insert so the log row itself carries the number — call history must
+    // show what was dialed even when the client doesn't send it.
+    if (validated.lead_id && !validated.to_number && !validated.from_number) {
+      try {
+        const { data: leadRow } = await req.db!.database
+          .from('leads')
+          .select('phone')
+          .eq('id', validated.lead_id)
+          .eq('user_id', userId)
+          .single();
+        if (leadRow?.phone) validated.to_number = leadRow.phone;
+      } catch { /* non-fatal */ }
+    }
+
     // Insert call log
     const { data: logData, error: logError } = await req.db!.database
       .from('call_logs')
@@ -69,20 +84,6 @@ router.post('/log', requireAuth, async (req: AuthenticatedRequest, res, next) =>
     // call log: no token / no match / PD error all return 200 with a
     // `pipedrive` status field.
     let pdResult: unknown = null;
-    {
-      // Campaign path: resolve the phone from the lead record
-      if (validated.lead_id && !validated.to_number && !validated.from_number) {
-        try {
-          const { data: leadRow } = await req.db!.database
-            .from('leads')
-            .select('phone')
-            .eq('id', validated.lead_id)
-            .eq('user_id', userId)
-            .single();
-          if (leadRow?.phone) validated.to_number = leadRow.phone;
-        } catch { /* non-fatal */ }
-      }
-    }
     if (validated.to_number || validated.from_number) {
       try {
         const phone = validated.direction === 'inbound'

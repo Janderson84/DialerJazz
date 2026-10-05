@@ -17,6 +17,18 @@ const DISPOSITION_COLORS: Record<string, string> = {
   dnc: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
 
+function formatPhone(raw?: string | null): string {
+  if (!raw) return '';
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `(${digits.slice(1,4)}) ${digits.slice(4,7)}-${digits.slice(7)}`;
+  }
+  if (digits.length === 10) {
+    return `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`;
+  }
+  return raw;
+}
+
 function formatDuration(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
@@ -209,6 +221,7 @@ export default function CallLogsPage() {
                     <th className="px-6 py-4 font-semibold">Date</th>
                     {isMaster && <th className="px-6 py-4 font-semibold">Rep</th>}
                     <th className="px-6 py-4 font-semibold">Lead</th>
+                    <th className="px-6 py-4 font-semibold">Number</th>
                     <th className="px-6 py-4 font-semibold">Campaign</th>
                     <th className="px-6 py-4 font-semibold">Duration</th>
                     <th className="px-6 py-4 font-semibold">Disposition</th>
@@ -247,6 +260,11 @@ export default function CallLogsPage() {
                             </div>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-foreground font-mono text-sm">
+                          {formatPhone(log.direction === 'inbound' ? log.from_number : log.to_number) || '—'}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         {log.campaign?.name || '-'}
