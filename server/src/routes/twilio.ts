@@ -3,7 +3,7 @@ import twilio from 'twilio';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
-import { fireAutoReplies } from './sms.js';
+import { fireAutoReplies, adminFetch } from './sms.js';
 
 const PUBLIC_BASE_URL = () =>
   process.env.PUBLIC_BASE_URL || 'https://3a50c7f3047f--3001.jackhamr.app';
@@ -212,7 +212,37 @@ router.post('/dial-status', express.urlencoded({ extended: false }), async (req:
     const from = (req.query.from as string) || req.body.From || '';
     const to = (req.query.to as string) || req.body.To || req.body.Called || '';
     const status = req.body.DialCallStatus || 'unknown';
-    console.log(`[Twilio dial-status] rep=${repId} from=${from} status=${status}`);
+    const duration = Number(req.body.DialCallDuration || req.body.AnsweredBy || 0) || 0;
+    console.log(`[Twilio dial-status] rep=${repId} from=${from} to=${to} status=${status} dur=${duration}`);
+
+    // Log the inbound call to history (was missing entirely: inbound calls
+    // never appeared in Call Logs). owner = rep if valid, else master.
+    if (/^[0-9a-f-]{36}$/i.test(repId) && from && to) {
+      try {
+        const admin = await adminFetch();
+        const logBody = {
+          user_id: repId,
+          direction: 'inbound',
+          from_number: from,
+          to_number: to,
+          provider: 'twilio',
+          status: status === 'completed' ? 'completed' : 'missed',
+          disposition: status === 'completed' ? 'answered' : 'missed',
+          duration_seconds: duration,
+          started_at: new Date().toISOString(),
+          ended_at: new Date().toISOString(),
+        };
+        const lr = await fetch(`${admin.base}/api/database/records/call_logs`, {
+          method: 'POST',
+          headers: { ...admin.headers(), 'Content-Type': 'application/json' },
+          body: JSON.stringify(logBody),
+        });
+        if (!lr.ok) console.error('[dial-status] call log insert failed:', (await lr.text()).slice(0, 200));
+        else console.log('[dial-status] inbound call logged');
+      } catch (e: any) {
+        console.error('[dial-status] call log error:', e?.message || e);
+      }
+    }
 
     if (status !== 'completed' && from && to) {
       // missed call — auto-replies fire from OUR number (to) to the contact (from)

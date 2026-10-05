@@ -91,7 +91,7 @@ const rows = Array.isArray(j) ? j : j?.data || [];
 
 // ── Admin API helper (server-side, bypasses RLS) ────────────────────
 let adminCache: { token: string; exp: number } | null = null;
-async function adminFetch() {
+export async function adminFetch() {
   const base = process.env.INFORGE_URL || process.env.INSFORGE_URL || 'http://localhost:7130';
   const username = process.env.INSFORGE_ADMIN_USER || 'admin';
   const password = process.env.INSFORGE_ADMIN_PASSWORD;
