@@ -21,7 +21,7 @@ import {
   Copy,
   Info,
   Smartphone
-} from 'lucide-react';
+, Pause, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import { callsApi, leadsApi, campaignsApi } from '@/lib/api';
 import type { Lead, Campaign } from '@/lib/api';
@@ -125,6 +125,20 @@ export default function CampaignDialerPage() {
   // Deliberately NOT clearing on unmount — the route must persist after
   // navigation so the bubble can show it. It gets cleared when the call ends.
   const isOnCall = ['trying', 'ringing', 'active'].includes(voice.primaryCallState);
+
+  // ── Session pause (break button) ──────────────────────────────────
+  // Pausing stops the power dialer from auto-dialing the next lead
+  // (post-disposition advance, post-SMS advance). Manual dial and
+  // swipe navigation still work; only automation is gated.
+  const [isSessionPaused, setIsSessionPaused] = useState(false);
+  const isSessionPausedRef = useRef(false);
+  const toggleSessionPause = useCallback(() => {
+    setIsSessionPaused(prev => {
+      const next = !prev;
+      isSessionPausedRef.current = next;
+      return next;
+    });
+  }, []);
   useEffect(() => {
     if (campaignId && !isOnCall) {
       voice.setActiveCallRoute(`/campaigns/${campaignId}/dial`);
@@ -221,9 +235,18 @@ export default function CampaignDialerPage() {
         }
         const dialDelay = Math.min(Math.max(campaign?.auto_dial_delay_ms ?? 1500, 0), 10000);
         setTimeout(() => {
+          // Pause can happen while these timers are pending — check at fire time.
+          if (isSessionPausedRef.current) {
+            toast.info("Paused — press Resume when you’re ready for the next call.");
+            return;
+          }
           void (async () => {
             await triggerSwipeLeft();
             setTimeout(() => {
+              if (isSessionPausedRef.current) {
+                toast.info("Paused — press Resume when you’re ready for the next call.");
+                return;
+              }
               const next = leads[currentIndex + 1];
               if (
                 next &&
@@ -369,6 +392,20 @@ export default function CampaignDialerPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {dialerSessionMode === 'power' && !isInCall && !showDisposition && (
+            <button
+              onClick={toggleSessionPause}
+              className={`px-3 py-1 rounded-full text-xs font-bold leading-none flex items-center gap-1.5 shadow-sm border transition-all ${
+                isSessionPaused
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20"
+                  : "bg-background text-foreground border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
+              }`}
+              title={isSessionPaused ? "Resume auto-dialing" : "Take a break — stop auto-dialing after this call"}
+            >
+              {isSessionPaused ? <Play className="h-3 w-3" /> : <Pause className="h-3 w-3" />}
+              {isSessionPaused ? 'Resume' : 'Pause'}
+            </button>
+          )}
           {campaign?.provider === 'local' ? (
             <span className="px-3 py-1 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-full text-xs font-bold leading-none flex items-center gap-1.5 shadow-sm">
               <Smartphone className="h-3 w-3" /> Local SIM
