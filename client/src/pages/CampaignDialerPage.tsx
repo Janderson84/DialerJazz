@@ -219,6 +219,7 @@ export default function CampaignDialerPage() {
           toast.success('All leads dialed! 🎉');
           return;
         }
+        const dialDelay = Math.min(Math.max(campaign?.auto_dial_delay_ms ?? 1500, 0), 10000);
         setTimeout(() => {
           void (async () => {
             await triggerSwipeLeft();
@@ -231,7 +232,7 @@ export default function CampaignDialerPage() {
               ) {
                 handleDialForLead(next);
               }
-            }, 1200);
+            }, dialDelay);
           })();
         }, 300);
       };

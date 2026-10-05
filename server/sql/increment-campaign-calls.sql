@@ -15,3 +15,6 @@ BEGIN
 END;
 $function$;
 GRANT EXECUTE ON FUNCTION public.increment_campaign_calls(uuid) TO project_admin;
+
+-- V1.5 residue: configurable power-dialer advance delay (ms)
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS auto_dial_delay_ms integer NOT NULL DEFAULT 1500 CHECK (auto_dial_delay_ms BETWEEN 0 AND 10000);

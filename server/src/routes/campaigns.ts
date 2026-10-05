@@ -161,6 +161,7 @@ router.patch('/:id/config', async (req: AuthenticatedRequest, res: Response, nex
       dialer_mode: z.enum(['preview', 'power', 'predictive', 'click']).optional(),
       provider: z.enum(['telnyx', 'twilio', 'local']).optional(),
       caller_number: z.string().optional().nullable(),
+      auto_dial_delay_ms: z.number().int().min(0).max(10000).optional(),
     });
     const updates = configSchema.parse(req.body);
 

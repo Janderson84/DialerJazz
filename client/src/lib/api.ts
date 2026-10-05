@@ -118,6 +118,7 @@ export interface Campaign {
   status: 'draft' | 'active' | 'paused' | 'completed';
   total_leads: number;
   leads_called: number;
+  auto_dial_delay_ms?: number;
   created_at: string;
   updated_at: string;
 }
@@ -150,7 +151,7 @@ export const campaignsApi = {
       body: JSON.stringify({ status }),
     }),
 
-  updateConfig: (id: string, config: { dialer_mode?: string; provider?: string; caller_number?: string | null }) =>
+  updateConfig: (id: string, config: { dialer_mode?: string; provider?: string; caller_number?: string | null; auto_dial_delay_ms?: number }) =>
     apiFetch<Campaign>(`/campaigns/${id}/config`, {
       method: 'PATCH',
       body: JSON.stringify(config),

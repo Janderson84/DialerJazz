@@ -37,6 +37,7 @@ export default function CampaignManagePage() {
         setSettings(settingsRes.data);
 
         setDialerMode(camp.dialer_mode || 'click');
+        setAutoDialDelayMs(camp.auto_dial_delay_ms ?? 1500);
         setProvider(camp.provider || 'twilio');
         setCallerNumber(camp.caller_number || '');
 
@@ -54,6 +55,7 @@ export default function CampaignManagePage() {
   }, [id, navigate]);
 
   const isLocked = campaign?.status !== 'draft';
+  const [autoDialDelayMs, setAutoDialDelayMs] = useState(1500);
 
   const handleSaveConfig = async () => {
     if (!id || isLocked) return;
@@ -62,7 +64,8 @@ export default function CampaignManagePage() {
       const res = await campaignsApi.updateConfig(id, {
         dialer_mode: dialerMode,
         provider,
-        caller_number: callerNumber || null
+        caller_number: callerNumber || null,
+        auto_dial_delay_ms: dialerMode === 'power' ? autoDialDelayMs : undefined,
       });
       setCampaign(res.data);
       toast.success('Configuration saved');
@@ -309,6 +312,25 @@ export default function CampaignManagePage() {
               onChange={setDialerMode}
               disabled={isLocked}
             />
+            {dialerMode === 'power' && (
+              <div className="space-y-1 rounded-xl border border-border p-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-foreground">Auto-dial delay</label>
+                  <span className="text-xs text-muted-foreground">{autoDialDelayMs >= 1000 ? `${(autoDialDelayMs / 1000).toFixed(autoDialDelayMs % 1000 === 0 ? 0 : 1)}s` : `${autoDialDelayMs}ms`}</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={10000}
+                  step={250}
+                  value={autoDialDelayMs}
+                  disabled={isLocked}
+                  onChange={(e) => setAutoDialDelayMs(Number(e.target.value))}
+                  className="w-full accent-foreground"
+                />
+                <p className="text-[11px] text-muted-foreground">How long to wait after logging a disposition before dialing the next lead.</p>
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
