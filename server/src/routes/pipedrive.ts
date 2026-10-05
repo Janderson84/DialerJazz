@@ -283,7 +283,7 @@ export async function pushPdCallActivity(
  */
 export async function createPdPersonIfMissing(
   token: string,
-  opts: { phone: string; name?: string; company?: string; email?: string }
+  opts: { phone: string; name?: string; company?: string; email?: string; owner_pd_user_id?: number }
 ): Promise<number | null> {
   if (!opts.phone?.replace(/\D/g, '')) return null;
   // Re-check: another call may have created this person milliseconds ago
@@ -308,6 +308,8 @@ export async function createPdPersonIfMissing(
       console.warn('[pipedrive] org resolve failed (continuing without):', e?.message || e);
     }
   }
+  // New contacts belong to the rep who called (not the master token owner)
+  if (opts.owner_pd_user_id) body.owner_id = opts.owner_pd_user_id;
   try {
     const person = await pdPost(token, '/persons', body);
     return person?.id ?? null;
@@ -365,7 +367,7 @@ export async function resolvePdByPhone(
     // When both sides are E.164 (leading +), require an EXACT match — a
     // last-10-digits match on international numbers can hit the wrong person.
     try {
-      const all = await pdGet(token, '/persons', { limit: 100 });
+      const all = await pdGet(token, '/persons', { limit: 500 });
       const digits = last10(phone);
       const isE164 = phone.startsWith('+');
       person = (all as any[]).find((p) =>

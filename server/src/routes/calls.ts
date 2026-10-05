@@ -118,6 +118,7 @@ router.post('/log', requireAuth, async (req: AuthenticatedRequest, res, next) =>
               name: [leadInfo.first_name, leadInfo.last_name].filter(Boolean).join(' ') || undefined,
               company: leadInfo.company || undefined,
               email: leadInfo.email || undefined,
+              owner_pd_user_id: pdUserId ?? undefined,
             });
             if (createdId) {
               personId = createdId;
