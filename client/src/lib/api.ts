@@ -250,6 +250,8 @@ export interface CallLog {
   lead_id: string | null;
   campaign_id: string | null;
   provider: string;
+  user_id?: string;
+  rep_name?: string;
   direction: string;
   from_number: string;
   to_number: string;
@@ -286,10 +288,11 @@ export const callsApi = {
       body: JSON.stringify(payload),
     }),
 
-  list: (params?: { campaign_id?: string; lead_id?: string } & PaginationParams) => {
+  list: (params?: { campaign_id?: string; lead_id?: string; rep?: string } & PaginationParams) => {
     const query = new URLSearchParams();
     if (params?.campaign_id) query.set('campaign_id', params.campaign_id);
     if (params?.lead_id) query.set('lead_id', params.lead_id);
+    if (params?.rep) query.set('rep', params.rep);
     if (params?.page) query.set('page', String(params.page));
     if (params?.per_page) query.set('per_page', String(params.per_page));
     const qs = query.toString();

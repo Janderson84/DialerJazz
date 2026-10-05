@@ -4,6 +4,7 @@ import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/hooks/usePagination';
 import { toast } from 'sonner';
 import { callsApi, campaignsApi, type CallLog, type Campaign } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 const DISPOSITION_COLORS: Record<string, string> = {
   answered: 'bg-foreground/10 text-foreground border-black/10 dark:border-white/10',
@@ -40,9 +41,21 @@ export default function CallLogsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState<string>('');
+  const [selectedRep, setSelectedRep] = useState<string>('');
+  const [roster, setRoster] = useState<{ rep_user_id: string; display_name: string }[]>([]);
+  const { user } = useAuth();
+  const MASTER_ID = 'a4d41720-59e1-4850-8b15-e8841872e702';
+  const isMaster = user?.id === MASTER_ID;
 
   const { currentPage, totalPages, setCurrentPage, resetPage, setMeta, perPage } =
     usePagination({ perPage: ITEMS_PER_PAGE });
+
+  useEffect(() => {
+    if (!isMaster) return;
+    import('@/lib/team').then(({ teamApi }) => teamApi.list()
+      .then(({ data }: any) => setRoster((data || []).map((m: any) => ({ rep_user_id: m.rep_user_id ?? m.id, display_name: m.display_name || 'Rep' }))))
+      .catch(() => {}))
+  }, [isMaster]);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -50,6 +63,7 @@ export default function CallLogsPage() {
       const [logsRes, campaignsRes] = await Promise.all([
         callsApi.list({
           campaign_id: selectedCampaign || undefined,
+          rep: isMaster ? (selectedRep || undefined) : undefined,
           page: currentPage,
           per_page: perPage,
         }),
@@ -63,7 +77,7 @@ export default function CallLogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCampaign, currentPage, perPage, setMeta]);
+  }, [selectedCampaign, selectedRep, isMaster, currentPage, perPage, setMeta]);
 
   useEffect(() => {
     fetchData();
@@ -115,6 +129,18 @@ export default function CallLogsPage() {
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
         </select>
+        {isMaster && (
+          <select
+            value={selectedRep}
+            onChange={(e) => { setSelectedRep(e.target.value); resetPage(); }}
+            className="px-4 py-2.5 rounded-[0.85rem] bg-surface border border-black/5 dark:border-white/5 text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all shadow-sm"
+          >
+            <option value="">All Reps</option>
+            {roster.map(r => (
+              <option key={r.rep_user_id} value={r.rep_user_id}>{r.display_name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Content */}
@@ -140,6 +166,7 @@ export default function CallLogsPage() {
                 <thead className="bg-muted text-xs uppercase text-muted-foreground text-opacity-70">
                   <tr>
                     <th className="px-6 py-4 font-semibold">Date</th>
+                    {isMaster && <th className="px-6 py-4 font-semibold">Rep</th>}
                     <th className="px-6 py-4 font-semibold">Lead</th>
                     <th className="px-6 py-4 font-semibold">Campaign</th>
                     <th className="px-6 py-4 font-semibold">Duration</th>
@@ -156,6 +183,14 @@ export default function CallLogsPage() {
                           <span className="text-foreground">{formatDate(log.created_at)}</span>
                         </div>
                       </td>
+                      {isMaster && (
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted text-xs font-medium text-foreground">
+                            <User className="h-3 w-3" />
+                            {log.rep_name || 'You'}
+                          </span>
+                        </td>
+                      )}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">

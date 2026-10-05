@@ -199,14 +199,55 @@ router.post('/log', requireAuth, async (req: AuthenticatedRequest, res, next) =>
     next(err);
   }
 });
-// GET /api/calls — List call logs for user
+// GET /api/calls — List call logs. Reps see their own; the master account
+// (team owner) sees EVERYONE's, with an optional ?rep=<rep_user_id> filter
+// and a resolved rep name on each row.
 router.get('/', requireAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
     const userId = req.user!.id;
-    const { campaign_id, lead_id } = req.query;
+    const { campaign_id, lead_id, rep } = req.query;
     const page = Math.max(1, Number(req.query.page) || 1);
     const perPage = Math.min(100, Math.max(1, Number(req.query.per_page) || 25));
     const offset = (page - 1) * perPage;
+
+    // Roster (admin fetch): determines whether the caller is the master and
+    // gives us rep ids + display names for attribution.
+    const base = process.env.INFORGE_URL || process.env.INSFORGE_URL || 'http://localhost:7130';
+    const adminUser = process.env.INSFORGE_ADMIN_USER || 'admin';
+    const adminPassword = process.env.INSFORGE_ADMIN_PASSWORD;
+    let isMaster = false;
+    const repNames = new Map<string, string>();
+    const rosterIds = new Set<string>();
+    if (adminPassword) {
+      try {
+        const s = await fetch(`${base}/api/auth/admin/sessions`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: adminUser, password: adminPassword }),
+        });
+        if (s.ok) {
+          const { accessToken } = await s.json();
+          const H = { Authorization: `Bearer ${accessToken}`, apikey: accessToken };
+          const rows = await fetch(`${base}/api/database/records/team_members?select=rep_user_id,display_name,master_user_id`, { headers: H }).then(r => r.json());
+          const team = (Array.isArray(rows) ? rows : rows?.data || []) as any[];
+          for (const m of team) {
+            rosterIds.add(m.rep_user_id);
+            repNames.set(m.rep_user_id, m.display_name || 'Rep');
+            if (m.master_user_id === userId) isMaster = true;
+          }
+        }
+      } catch { /* best effort — falls back to own-logs view */ }
+    }
+
+    // Scope: master with explicit rep filter sees that rep only; master with
+    // no filter sees the whole team + own logs; reps always see only their own.
+    let scopeIds: string[];
+    if (isMaster && typeof rep === 'string' && /^[0-9a-f-]{36}$/i.test(rep)) {
+      scopeIds = [rep];
+    } else if (isMaster) {
+      scopeIds = [...rosterIds, userId];
+    } else {
+      scopeIds = [userId];
+    }
 
     let query = req.db!.database
       .from('call_logs')
@@ -227,10 +268,11 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res, next) => {
         started_at,
         ended_at,
         created_at,
+        user_id,
         leads (first_name, last_name, company, phone),
         campaigns (name)
       `, { count: 'exact' })
-      .eq('user_id', userId)
+      .in('user_id', scopeIds)
       .order('created_at', { ascending: false });
 
     if (campaign_id) {
@@ -249,6 +291,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res, next) => {
 
     const formattedData = data?.map((row: any) => ({
       ...row,
+      rep_name: repNames.get(row.user_id) || (row.user_id === userId ? (req.user!.name || 'You') : undefined),
       lead: row.leads ? {
         first_name: row.leads.first_name,
         last_name: row.leads.last_name,
