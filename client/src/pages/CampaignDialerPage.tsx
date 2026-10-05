@@ -34,7 +34,7 @@ import DispositionOverlay from '@/components/DispositionOverlay';
 import SmsAfterCallOverlay from '@/components/SmsAfterCallOverlay';
 
 type DialerMode = 'power' | 'click';
-type Disposition = 'answered' | 'follow_up' | 'not_interested' | 'no_answer' | 'voicemail' | 'busy' | 'dnc';
+type Disposition = 'answered' | 'follow_up' | 'not_interested' | 'no_answer' | 'voicemail' | 'busy' | 'wrong_number' | 'dnc';
 
 const DISPOSITIONS: { value: Disposition; label: string; color: string; emoji: string; primary?: boolean }[] = [
   { value: 'answered',       label: 'Interested',     color: 'bg-foreground text-background', emoji: '🔥', primary: true },
@@ -42,7 +42,8 @@ const DISPOSITIONS: { value: Disposition; label: string; color: string; emoji: s
   { value: 'not_interested',label: 'Not Interested', color: 'bg-muted text-foreground',   emoji: '❄️', primary: true },
   { value: 'no_answer',      label: 'No Answer',      color: 'bg-muted text-foreground', emoji: '📵' },
   { value: 'voicemail',      label: 'Voicemail',       color: 'bg-muted text-foreground',emoji: '📩' },
-  { value: 'busy',           label: 'Wrong Number',    color: 'bg-muted text-foreground',emoji: '❌' },
+  { value: 'busy',           label: 'Busy',            color: 'bg-muted text-foreground',emoji: '📞' },
+  { value: 'wrong_number',   label: 'Wrong Number',    color: 'bg-muted text-foreground',emoji: '❌' },
   { value: 'dnc',            label: 'Do Not Call',     color: 'bg-muted text-foreground',   emoji: '🚫' },
 ];
 
