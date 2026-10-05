@@ -14,6 +14,7 @@ const DISPOSITION_COLORS: Record<string, string> = {
   no_answer: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
   voicemail: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
   busy: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+  wrong_number: 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30',
   dnc: 'bg-red-500/20 text-red-400 border-red-500/30',
 };
 
