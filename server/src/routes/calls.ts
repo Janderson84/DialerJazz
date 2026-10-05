@@ -281,6 +281,13 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res, next) => {
     if (lead_id) {
       query = query.eq('lead_id', lead_id as string);
     }
+    // Date range (inclusive), compared against the call start timestamp.
+    if (typeof req.query.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.from)) {
+      query = query.gte('started_at', `${req.query.from}T00:00:00Z`);
+    }
+    if (typeof req.query.to === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.to)) {
+      query = query.lte('started_at', `${req.query.to}T23:59:59Z`);
+    }
 
     const { data, count, error } = await query.range(offset, offset + perPage - 1);
 

@@ -42,6 +42,8 @@ export default function CallLogsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState<string>('');
   const [selectedRep, setSelectedRep] = useState<string>('');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
   const [roster, setRoster] = useState<{ rep_user_id: string; display_name: string }[]>([]);
   const { user } = useAuth();
   const MASTER_ID = 'a4d41720-59e1-4850-8b15-e8841872e702';
@@ -49,6 +51,7 @@ export default function CallLogsPage() {
 
   const { currentPage, totalPages, setCurrentPage, resetPage, setMeta, perPage } =
     usePagination({ perPage: ITEMS_PER_PAGE });
+  const [meta, setMetaState] = useState<{ total: number } | null>(null);
 
   useEffect(() => {
     if (!isMaster) return;
@@ -64,6 +67,8 @@ export default function CallLogsPage() {
         callsApi.list({
           campaign_id: selectedCampaign || undefined,
           rep: isMaster ? (selectedRep || undefined) : undefined,
+          from: fromDate || undefined,
+          to: toDate || undefined,
           page: currentPage,
           per_page: perPage,
         }),
@@ -71,13 +76,14 @@ export default function CallLogsPage() {
       ]);
       setCallLogs(logsRes.data);
       setMeta(logsRes.meta);
+      setMetaState({ total: (logsRes.meta as any)?.total ?? 0 });
       setCampaigns(campaignsRes.data);
     } catch (error: any) {
       toast.error(error.message || 'Failed to fetch call logs');
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCampaign, selectedRep, isMaster, currentPage, perPage, setMeta]);
+  }, [selectedCampaign, selectedRep, fromDate, toDate, isMaster, currentPage, perPage, setMeta]);
 
   useEffect(() => {
     fetchData();
@@ -141,6 +147,41 @@ export default function CallLogsPage() {
             ))}
           </select>
         )}
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={fromDate}
+            max={toDate || undefined}
+            onChange={(e) => { setFromDate(e.target.value); resetPage(); }}
+            className="px-3 py-2.5 rounded-[0.85rem] bg-surface border border-black/5 dark:border-white/5 text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all shadow-sm"
+          />
+          <span className="text-muted-foreground text-sm">–</span>
+          <input
+            type="date"
+            value={toDate}
+            min={fromDate || undefined}
+            onChange={(e) => { setToDate(e.target.value); resetPage(); }}
+            className="px-3 py-2.5 rounded-[0.85rem] bg-surface border border-black/5 dark:border-white/5 text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all shadow-sm"
+          />
+          {(fromDate || toDate) && (
+            <button
+              onClick={() => { setFromDate(''); setToDate(''); resetPage(); }}
+              className="px-3 py-2.5 rounded-[0.85rem] text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Result count for the selected view */}
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <PhoneCall className="h-3.5 w-3.5" />
+        <span>
+          <span className="font-semibold text-foreground">{meta?.total ?? 0}</span>
+          {' '}call{(meta?.total ?? 0) === 1 ? '' : 's'} in view
+          {(fromDate || toDate || selectedRep || selectedCampaign) && ' (filtered)'}
+        </span>
       </div>
 
       {/* Content */}
