@@ -15,7 +15,7 @@ import leadsRouter from './routes/leads.js';
 import statsRouter from './routes/stats.js';
 import callsRouter from './routes/calls.js';
 import telnyxRouter from './routes/telnyx.js';
-import twilioRouter from './routes/twilio.js';
+import twilioRouter, { startTranscriptPoller } from './routes/twilio.js';
 import teamRouter from './routes/team.js';
 import voicemailRouter from './routes/voicemail.js';
 import pipedriveRouter from './routes/pipedrive.js';
@@ -139,6 +139,7 @@ const PORT = process.env.PORT || 3001;
 if (process.env.NODE_ENV !== 'test') {
   ensureSchema(); // re-apply fragile SQL (campaign counter RPC) — InsForge reconciler drops unknown functions
   startScheduledSweep(); // fires due scheduled SMS every minute
+  startTranscriptPoller(); // attaches completed call transcriptions
   httpServer.listen(PORT, () => {
     console.log(`🚀 SalesCloser Cold Call Machine API running on http://localhost:${PORT}`);
   });

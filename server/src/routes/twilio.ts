@@ -309,9 +309,79 @@ router.post('/recording-status', express.urlencoded({ extended: false }), async 
       body: JSON.stringify({ recording_url: `${url}.mp3` }),
     });
     console.log('[Twilio recording-status] recording attached to log', row.id);
+
+    // Fire-and-forget: create a Twilio Intelligence transcript for this
+    // recording (uses the master account; no extra API key needed).
+    try {
+      const master = await getMasterTwilioSettings();
+      const twilioAccountSid = master?.twilio_account_sid || '';
+      const twilioAuthToken = master?.twilio_auth_token || '';
+      if (twilioAccountSid && twilioAuthToken) {
+        const serviceSid = process.env.TWILIO_INTELLIGENCE_SID || '';
+        const body: Record<string, string> = {
+          SourceSid: (req.body.RecordingSid || ''),
+        };
+        if (serviceSid) body.ServiceSid = serviceSid;
+        const tr = await fetch(`https://intelligence.twilio.com/v2/Transcripts`, {
+          method: 'POST',
+          headers: {
+            Authorization: 'Basic ' + Buffer.from(`${twilioAccountSid}:${twilioAuthToken}`).toString('base64'),
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams(body).toString(),
+        });
+        const tj = await tr.json().catch(() => ({}));
+        if (tr.ok && tj?.sid) {
+          await fetch(`${admin.base}/api/database/records/call_logs?id=eq.${row.id}`, {
+            method: 'PATCH',
+            headers: { ...admin.headers(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ transcription_sid: tj.sid, transcription_status: 'in-progress' }),
+          });
+          console.log('[Twilio recording-status] transcript job created:', tj.sid);
+        } else {
+          console.warn('[Twilio recording-status] transcript create failed:', tr.status, JSON.stringify(tj).slice(0, 200));
+        }
+      }
+    } catch (e: any) {
+      console.warn('[Twilio recording-status] transcript error:', e?.message || e);
+    }
     res.status(200).send('OK');
   } catch (err) {
     console.error('[Twilio recording-status] error:', err);
+    res.status(200).send('OK');
+  }
+});
+
+// ── GET/POST /api/twilio/transcript-status ─────────────────────────
+// Twilio Intelligence fires this when a transcript completes (or we poll).
+// Pull the transcript text and attach it to the matching call_log row.
+async function attachTranscript(transcriptSid: string): Promise<void> {
+  const master = await getMasterTwilioSettings();
+  const acct = master?.twilio_account_sid || '';
+  const tok = master?.twilio_auth_token || '';
+  if (!acct || !tok) return;
+  const auth = 'Basic ' + Buffer.from(`${acct}:${tok}`).toString('base64');
+  const tr = await fetch(`https://intelligence.twilio.com/v2/Transcripts/${transcriptSid}/Sentences`, { headers: { Authorization: auth } });
+  if (!tr.ok) throw new Error(`sentences fetch ${tr.status}`);
+  const sentences = await tr.json().catch(() => ({}));
+  const text = (sentences?.sentences || []).map((s: any) => s.transcript || '').join(' ').trim();
+  if (!text) return;
+  const admin = await adminFetch();
+  await fetch(`${admin.base}/api/database/records/call_logs?transcription_sid=eq.${transcriptSid}`, {
+    method: 'PATCH',
+    headers: { ...admin.headers(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transcription: text.slice(0, 10000), transcription_status: 'completed' }),
+  });
+  console.log(`[transcript-status] attached transcript for ${transcriptSid} (${text.length} chars)`);
+}
+
+router.all('/transcript-status', express.urlencoded({ extended: false }), async (req: Request, res: Response) => {
+  try {
+    const sid = req.body?.TranscriptSid || req.query?.TranscriptSid || '';
+    if (sid) await attachTranscript(String(sid));
+    res.status(200).send('OK');
+  } catch (err: any) {
+    console.error('[transcript-status] error:', err?.message || err);
     res.status(200).send('OK');
   }
 });
@@ -328,5 +398,37 @@ router.post('/webhook', express.json(), async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
+
+// Poll in-progress transcripts every 2 minutes (belt-and-braces alongside
+// the webhook; Intelligence webhooks need per-service config).
+export function startTranscriptPoller(): void {
+  setInterval(async () => {
+    try {
+      const admin = await adminFetch();
+      const pending = await fetch(`${admin.base}/api/database/records/call_logs?transcription_status=eq.in-progress&select=transcription_sid&limit=10`, { headers: admin.headers() }).then(r => r.json());
+      const rows = (Array.isArray(pending) ? pending : pending?.data || []) as any[];
+      for (const row of rows) {
+        if (!row.transcription_sid) continue;
+        try {
+          await attachTranscript(row.transcription_sid);
+        } catch {
+          // Intelligence may still be processing — check its status explicitly
+          try {
+            const master = await getMasterTwilioSettings();
+            const auth = 'Basic ' + Buffer.from(`${master?.twilio_account_sid}:${master?.twilio_auth_token}`).toString('base64');
+            const st = await fetch(`https://intelligence.twilio.com/v2/Transcripts/${row.transcription_sid}`, { headers: { Authorization: auth } }).then(r => r.json());
+            if (st?.status === 'failed' || st?.status === 'canceled') {
+              await fetch(`${admin.base}/api/database/records/call_logs?transcription_sid=eq.${row.transcription_sid}`, {
+                method: 'PATCH',
+                headers: { ...admin.headers(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ transcription_status: 'failed' }),
+              });
+            }
+          } catch { /* next poll */ }
+        }
+      }
+    } catch { /* non-fatal */ }
+  }, 2 * 60 * 1000);
+}
 
 export default router;

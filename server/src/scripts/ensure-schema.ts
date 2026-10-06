@@ -26,6 +26,7 @@ const PG = {
 // Order matters. Each statement re-applied idempotently.
 const FRAGILE = [
   'increment-campaign-calls.sql',
+  'call-logs-columns.sql',
 ];
 
 export async function ensureSchema(): Promise<void> {
