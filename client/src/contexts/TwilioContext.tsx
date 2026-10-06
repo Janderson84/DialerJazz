@@ -62,7 +62,7 @@ try {
     } catch { /* noop */ }
     return p;
   };
-  console.log('[TwilioContext] Device.connect wrapped for diagnostics');
+  debugLog('[TwilioContext] Device.connect wrapped for diagnostics');
 } catch (wrapErr) {
   console.error('[TwilioContext] Failed to wrap Device.connect:', wrapErr);
 }
@@ -71,6 +71,12 @@ import { useAuth } from './AuthContext';
 
 
 import type { ConnectionStatus, CallState, QualityMetrics } from './TelnyxContext';
+
+// Diagnostic logging — silenced in production; set localStorage.debugVoice = '1' to enable.
+function debugLog(...args: unknown[]) {
+  try { if (localStorage.getItem('debugVoice') === '1') console.log(...args); } catch { /* noop */ }
+}
+
 
 // ── Types ────────────────────────────────────────────────────────────
 export interface TwilioContextValue {
@@ -196,10 +202,10 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
   // ── Helper to attach Call event listeners ──────────────────────────
   const attachCallListeners = useCallback((call: Call) => {
-    console.log('[TwilioContext] Attaching listeners to call:', call.parameters);
+    debugLog('[TwilioContext] Attaching listeners to call:', call.parameters);
 
     call.on('accept', () => {
-      console.log('[TwilioContext] Call accepted');
+      debugLog('[TwilioContext] Call accepted');
       primaryCallRef.current = call;
       setPrimaryCall(call);
       setPrimaryCallState('active');
@@ -208,7 +214,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     });
 
     call.on('disconnect', () => {
-      console.log('[TwilioContext] Call disconnected');
+      debugLog('[TwilioContext] Call disconnected');
       stopPrimaryTimer();
       primaryCallRef.current = null;
       setPrimaryCall(null);
@@ -236,13 +242,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           to_number: meta.to_number || null,
           from_number: meta.from_number || null,
         };
-        console.log('[TwilioContext] Auto-logging call:', payload);
+        debugLog('[TwilioContext] Auto-logging call:', payload);
         callsApi.log(payload).catch((err) => console.error('[TwilioContext] Auto-log failed:', err));
       }
     });
 
     call.on('cancel', () => {
-      console.log('[TwilioContext] Call cancelled');
+      debugLog('[TwilioContext] Call cancelled');
       stopPrimaryTimer();
       primaryCallRef.current = null;
       setPrimaryCall(null);
@@ -254,7 +260,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
     });
 
     call.on('reject', () => {
-      console.log('[TwilioContext] Call rejected');
+      debugLog('[TwilioContext] Call rejected');
       stopPrimaryTimer();
       primaryCallRef.current = null;
       setPrimaryCall(null);
@@ -271,13 +277,13 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
     // Ringing event
     call.on('ringing', () => {
-      console.log('[TwilioContext] Call ringing');
+      debugLog('[TwilioContext] Call ringing');
       setPrimaryCallState('ringing');
     });
 
     // Track connection state changes for debugging
     call.on('stateChanged', (state: string) => {
-      console.log('[TwilioContext] Call state changed to:', state);
+      debugLog('[TwilioContext] Call state changed to:', state);
     });
   }, [startPrimaryTimer, stopPrimaryTimer]);
 
@@ -320,7 +326,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         throw new Error('Failed to get Twilio token');
       }
 
-      console.log('[TwilioContext] Creating Device with token');
+      debugLog('[TwilioContext] Creating Device with token');
       // Forward SDK internal logs to the diag sink — the connect failure path
       // (mic acquisition, invite publish) only shows up in SDK debug logs.
       loglevel.setLevel(loglevel.levels.DEBUG);
@@ -366,7 +372,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
 
       // Device events
       device.on('registered', () => {
-        console.log('[TwilioContext] Device registered');
+        debugLog('[TwilioContext] Device registered');
         diag('device.registered');
         setConnectionStatus('registered');
         setError(null);
@@ -379,7 +385,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       });
 
       device.on('incoming', (call: Call) => {
-        console.log('[TwilioContext] Incoming call:', call.parameters);
+        debugLog('[TwilioContext] Incoming call:', call.parameters);
         incomingCallRef.current = call;
         setIncomingCall(call);
         setIncomingCallerNumber(call.parameters?.From || 'Unknown');
@@ -403,7 +409,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       });
 
       device.on('tokenWillExpire', async () => {
-        console.log('[TwilioContext] Token expiring, refreshing...');
+        debugLog('[TwilioContext] Token expiring, refreshing...');
         try {
           const refreshRes = await twilioApi.getToken();
           if (refreshRes.data?.token) {
@@ -419,7 +425,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       (window as any).__scDevice = device;
       (window as any).__scDeviceTag = (Device as any).__scModuleTag;
 
-      console.log('[TwilioContext] Device connected and registered');
+      debugLog('[TwilioContext] Device connected and registered');
       diag('device.register.done');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Failed to initialize Twilio';
@@ -478,7 +484,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      console.log('[TwilioContext] dial():', { destinationNumber, resolvedCallerNumber });
+      debugLog('[TwilioContext] dial():', { destinationNumber, resolvedCallerNumber });
       // Call metadata for auto-logging on disconnect (unless the caller logs itself,
       // e.g. CampaignDialerPage which logs with lead_id for the attempt counter).
       callMetaRef.current = opts?.autoLog === false
@@ -582,7 +588,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
       connectPromise.then((call) => {
         connectSettled = true;
         clearTimeout(connectTimer);
-        console.log('[TwilioContext] device.connect() succeeded, call parameters:', call.parameters);
+        debugLog('[TwilioContext] device.connect() succeeded, call parameters:', call.parameters);
         diag('device.connect.resolved', JSON.stringify(call.parameters || {}).slice(0, 300));
         // attach error listener IMMEDIATELY — errors can fire before 'accept'
         // (e.g. mic acquisition failure inside the SDK) and were being missed.

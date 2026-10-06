@@ -23,6 +23,12 @@ import { TelnyxRTC, Call, SwEvent } from '@telnyx/webrtc';
 import type { INotification } from '@telnyx/webrtc';
 import { settingsApi, telnyxApi, callsApi } from '@/lib/api';
 
+// Diagnostic logging — silenced in production; set localStorage.debugVoice = '1' to enable.
+function debugLog(...args: unknown[]) {
+  try { if (localStorage.getItem('debugVoice') === '1') console.log(...args); } catch { /* noop */ }
+}
+
+
 // ── Utilities ────────────────────────────────────────────────────────
 function toE164(number: string): string {
   const digits = number.replace(/\D/g, '');
@@ -188,8 +194,8 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
       const direction = call.direction;
       const callId = call.id;
 
-      console.log(`[TelnyxContext] Notification: id=${callId}, direction=${direction}, state=${state}`);
-      console.log('[TelnyxContext] Call options payload:', {
+      debugLog(`[TelnyxContext] Notification: id=${callId}, direction=${direction}, state=${state}`);
+      debugLog('[TelnyxContext] Call options payload:', {
         callerNumber: call.options?.callerNumber,
         callerName: call.options?.callerName,
         destinationNumber: call.options?.destinationNumber,
@@ -198,7 +204,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
 
       // ── Ignore zombie notifications from calls we already hung up ──
       if (hungUpCallIdsRef.current.has(callId)) {
-        console.log(`[TelnyxContext] Ignoring zombie notification for hung-up call ${callId}`);
+        debugLog(`[TelnyxContext] Ignoring zombie notification for hung-up call ${callId}`);
         // Clean up the ID once we get a terminal state
         if (['done', 'hangup', 'destroy'].includes(state)) {
           hungUpCallIdsRef.current.delete(callId);
@@ -214,7 +220,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
           setIncomingCall(call);
           setIncomingCallerNumber(call.options?.callerNumber || call.options?.remoteCallerNumber || 'Unknown');
           setIncomingCallerName(call.options?.callerName || '');
-          console.log('[TelnyxContext] Incoming call detected:', call.options?.callerNumber);
+          debugLog('[TelnyxContext] Incoming call detected:', call.options?.callerNumber);
         }
         return;
       }
@@ -342,7 +348,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
             to_number: meta.to_number || null,
             from_number: meta.from_number || null,
           };
-          console.log('[TelnyxContext] Auto-logging call:', payload);
+          debugLog('[TelnyxContext] Auto-logging call:', payload);
           callsApi.log(payload).catch((err) => console.error('[TelnyxContext] Auto-log failed:', err));
         }
 
@@ -360,7 +366,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
   const setupClient = useCallback(
     (client: TelnyxRTC) => {
       client.on('telnyx.socket.open', () => {
-        console.log('[TelnyxContext] Socket connected');
+        debugLog('[TelnyxContext] Socket connected');
       });
 
       client.on('telnyx.socket.error', (err: unknown) => {
@@ -371,7 +377,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
       client.on('telnyx.ready', () => {
         setConnectionStatus('registered');
         setError(null);
-        console.log('[TelnyxContext] Registered successfully');
+        debugLog('[TelnyxContext] Registered successfully');
       });
 
       client.on('telnyx.error', (err: unknown) => {
@@ -383,7 +389,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
 
       client.on('telnyx.socket.close', () => {
         setConnectionStatus('disconnected');
-        console.log('[TelnyxContext] Socket closed');
+        debugLog('[TelnyxContext] Socket closed');
       });
 
       client.on(SwEvent.StatsFrame, (frame: QualityMetrics) => {
@@ -410,7 +416,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
       const settingsRes = await settingsApi.get();
       const settings = settingsRes.data;
 
-      console.log('[TelnyxContext] initConnection() fetched settings:', {
+      debugLog('[TelnyxContext] initConnection() fetched settings:', {
         telnyx_sip_login: !!settings?.telnyx_sip_login,
         telnyx_api_key: !!settings?.telnyx_api_key,
         telnyx_caller_number: settings?.telnyx_caller_number,
@@ -506,7 +512,7 @@ export function TelnyxProvider({ children }: { children: ReactNode }) {
 
       const formattedCallerNumber = toE164(resolvedCallerNumber);
 
-      console.log('[TelnyxContext] dial():', {
+      debugLog('[TelnyxContext] dial():', {
         destinationNumber,
         rawCallerNumber: resolvedCallerNumber,
         formattedCallerNumber
