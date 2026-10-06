@@ -284,11 +284,28 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res, next) => {
       query = query.eq('lead_id', lead_id as string);
     }
     // Date range (inclusive), compared against the call start timestamp.
+    // Dates are interpreted in the team's local timezone (America/Vancouver),
+    // not UTC — "from=2026-10-06" must include calls made 00:00–07:00 UTC.
+    const TZ = 'America/Vancouver';
+    const localDayToUtcRange = (day: string): { gte: string; lte: string } => {
+      // DST-aware: 00:00 local on `day` -> UTC instant (Intl-based offset probe)
+      const noonUtc = new Date(`${day}T12:00:00Z`);
+      const localMidnightOffsetMs = (() => {
+        const parts = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(noonUtc);
+        const [h, m, sec] = parts.split(':').map(Number);
+        return (h * 3600 + m * 60 + sec) * 1000 - 12 * 3600 * 1000; // local-noon offset from UTC noon
+      })();
+      const startMs = noonUtc.getTime() - 12 * 3600 * 1000 - localMidnightOffsetMs;
+      return {
+        gte: new Date(startMs).toISOString(),
+        lte: new Date(startMs + 24 * 3600 * 1000 - 1).toISOString(),
+      };
+    };
     if (typeof req.query.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.from)) {
-      query = query.gte('started_at', `${req.query.from}T00:00:00Z`);
+      query = query.gte('started_at', localDayToUtcRange(req.query.from).gte);
     }
     if (typeof req.query.to === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.to)) {
-      query = query.lte('started_at', `${req.query.to}T23:59:59Z`);
+      query = query.lte('started_at', localDayToUtcRange(req.query.to).lte);
     }
 
     const { data, count, error } = await query.range(offset, offset + perPage - 1);
