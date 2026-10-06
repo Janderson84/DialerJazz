@@ -48,14 +48,16 @@ export default function Dashboard() {
     }
   }, []);
 
+  const [pulseRange, setPulseRange] = useState<'today' | 'week' | 'month'>('today');
+
   const fetchTeamPulse = useCallback(async () => {
     try {
-      const { data } = await statsApi.getTeamPulse();
+      const { data } = await statsApi.getTeamPulse(pulseRange);
       setTeamPulse(data || []);
     } catch {
       // non-fatal
     }
-  }, []);
+  }, [pulseRange]);
 
   useEffect(() => {
     fetchCampaigns();
@@ -185,11 +187,24 @@ export default function Dashboard() {
         <div className="bg-white dark:bg-[#0F0F12] rounded-xl p-6 flex flex-col border border-gray-200 dark:border-[#1F1F23]">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 text-left flex items-center gap-2">
             <Users className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-50" />
-            Team Pulse — Today
+            Team Pulse
           </h2>
+          <div className="flex gap-1 ml-auto">
+            {(['today', 'week', 'month'] as const).map(r => (
+              <button
+                key={r}
+                onClick={() => setPulseRange(r)}
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium capitalize transition-colors ${pulseRange === r
+                  ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900'
+                  : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100'}`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
           <div className="space-y-2">
             {teamPulse.length === 0 ? (
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">No outbound calls logged yet today.</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">No outbound calls logged this {pulseRange === 'today' ? 'day' : pulseRange}.</p>
             ) : teamPulse.map((r) => (
               <div key={r.rep_user_id} className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-all duration-200">
                 <div className="flex items-center gap-2 min-w-0">

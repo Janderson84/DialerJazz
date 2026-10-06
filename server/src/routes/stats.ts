@@ -68,10 +68,30 @@ router.get('/team-pulse', async (req: AuthenticatedRequest, res: Response, next:
     const todayLocal = nowParts; // YYYY-MM-DD
     const localDay = (iso: string) => new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(iso));
 
+    // Range: ?range=today (default) | week | month — all in rep-local time.
+    const range = (typeof req.query.range === 'string' && ['today', 'week', 'month'].includes(req.query.range)) ? req.query.range : 'today';
+    const inRange = (iso: string): boolean => {
+      if (!iso) return false;
+      if (range === 'today') return localDay(iso) === todayLocal;
+      const d = new Date(iso);
+      if (range === 'week') {
+        // Last 7 days including today, local
+        for (let i = 0; i < 7; i++) {
+          const day = new Date(Date.now() - i * 86400000);
+          if (localDay(iso) === new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(day)) return true;
+        }
+        return false;
+      }
+      // month: same local calendar month
+      const nowM = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit' }).format(new Date());
+      const logM = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit' }).format(d);
+      return nowM === logM;
+    };
+
     const perRep = new Map<string, { calls: number; connected: number; secs: number }>();
     const CONNECTED = new Set(['answered', 'follow_up', 'not_interested', 'meeting_booked']);
     for (const l of logs) {
-      if (!l.started_at || localDay(l.started_at) !== todayLocal) continue;
+      if (!inRange(l.started_at)) continue;
       const e = perRep.get(l.user_id) || { calls: 0, connected: 0, secs: 0 };
       e.calls += 1;
       if (CONNECTED.has(l.disposition)) e.connected += 1;
