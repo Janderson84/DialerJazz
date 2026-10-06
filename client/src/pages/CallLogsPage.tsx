@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { PhoneCall, Search, Loader2, Clock, User, Building2, MessageSquare } from 'lucide-react';
+import { PhoneCall, Search, Loader2, Clock, User, Building2, MessageSquare, Play } from 'lucide-react';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/hooks/usePagination';
 import { toast } from 'sonner';
@@ -226,6 +226,7 @@ export default function CallLogsPage() {
                     <th className="px-6 py-4 font-semibold">Campaign</th>
                     <th className="px-6 py-4 font-semibold">Duration</th>
                     <th className="px-6 py-4 font-semibold">Disposition</th>
+                    <th className="px-6 py-4 font-semibold">Audio</th>
                     <th className="px-6 py-4 font-semibold">Notes</th>
                   </tr>
                 </thead>
@@ -282,6 +283,21 @@ export default function CallLogsPage() {
                           </span>
                         ) : (
                           <span className="text-muted-foreground text-opacity-70">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        {log.recording_url ? (
+                          <a
+                            href={log.recording_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-400 text-xs font-medium hover:bg-indigo-500/25 transition-colors"
+                          >
+                            <Play className="h-3 w-3" />
+                            Play
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground text-opacity-40">—</span>
                         )}
                       </td>
                       <td className="px-6 py-4 max-w-xs">
