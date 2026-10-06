@@ -148,7 +148,14 @@ router.post('/voice', express.urlencoded({ extended: false }), async (req: Reque
       const outboundCallerId = repLine || from;
       console.log(`[Twilio Voice Webhook] outbound callerId=${outboundCallerId} (rep=${repId || 'master'}, repLine=${repLine || 'none'})`);
       const clean = to.replace(/[^\d+]/g, '');
-      const amd = twiml.dial({ callerId: outboundCallerId, machineDetection: 'DetectMessageEnd', machineDetectionTimeout: 10 } as any);
+      const amd = twiml.dial({
+        callerId: outboundCallerId,
+        machineDetection: 'DetectMessageEnd',
+        machineDetectionTimeout: 10,
+        record: 'record-from-answer-dual',
+        recordingStatusCallback: `${PUBLIC_BASE_URL()}/api/twilio/recording-status?rep=${attributionId}`,
+        recordingStatusCallbackEvent: 'completed',
+      } as any);
       amd.number({
         url: `${PUBLIC_BASE_URL()}/api/voicemail/amd-callback?rep=${attributionId}`,
         method: 'POST',
@@ -189,7 +196,15 @@ router.post('/inbound', express.urlencoded({ extended: false }), async (req: Req
       console.log('[Twilio Inbound] invalid rep id, falling back to master');
     }
 
-    const dial = twiml.dial({ callerId: from, timeout: 25, action: `${PUBLIC_BASE_URL()}/api/twilio/dial-status?rep=${repId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(req.body.To || '')}`, method: 'POST' });
+    const dial = twiml.dial({
+      callerId: from,
+      timeout: 25,
+      record: 'record-from-answer-dual',
+      recordingStatusCallback: `${PUBLIC_BASE_URL()}/api/twilio/recording-status?rep=${repId}`,
+      recordingStatusCallbackEvent: 'completed',
+      action: `${PUBLIC_BASE_URL()}/api/twilio/dial-status?rep=${repId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(req.body.To || '')}`,
+      method: 'POST',
+    } as any);
     dial.client(targetClient);
     // If the rep doesn't answer, take a voicemail
     twiml.say('The person you are calling is unavailable. Please leave a message after the tone.');
@@ -220,6 +235,16 @@ router.post('/dial-status', express.urlencoded({ extended: false }), async (req:
     if (/^[0-9a-f-]{36}$/i.test(repId) && from && to) {
       try {
         const admin = await adminFetch();
+        // Attach the Twilio CallSid so recordings (which callback with the
+        // parent CallSid) can be matched back to this log row.
+        const dialSid = req.body.DialCallSid || req.body.CallSid || '';
+        if (dialSid) {
+          await fetch(`${admin.base}/api/database/records/call_logs?user_id=eq.${repId}&direction=eq.outbound&order=created_at.desc&limit=1`, {
+            method: 'PATCH',
+            headers: { ...admin.headers(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ call_sid: dialSid }),
+          }).catch(() => {});
+        }
         const logBody = {
           user_id: repId,
           direction: 'inbound',
@@ -258,6 +283,36 @@ router.post('/dial-status', express.urlencoded({ extended: false }), async (req:
   } catch (err) {
     console.error('[Twilio dial-status] error:', err);
     res.status(200).type('text/xml').send('<Response/>');
+  }
+});
+
+// ── POST /api/twilio/recording-status ──────────────────────────────
+// Recording finished. Match the parent CallSid to a call_log row and
+// persist the recording URL for playback in call history.
+router.post('/recording-status', express.urlencoded({ extended: false }), async (req: Request, res: Response) => {
+  try {
+    const sid = req.body.CallSid || '';
+    const url = req.body.RecordingUrl || '';
+    const duration = Number(req.body.RecordingDuration || 0) || 0;
+    console.log(`[Twilio recording-status] sid=${sid} dur=${duration} url=${url.slice(0, 80)}`);
+    if (!sid || !url) return res.status(200).send('OK');
+    const admin = await adminFetch();
+    const found = await fetch(`${admin.base}/api/database/records/call_logs?call_sid=eq.${encodeURIComponent(sid)}&select=id&limit=1`, { headers: admin.headers() }).then(r => r.json());
+    const row = (Array.isArray(found) ? found : found?.data || [])[0];
+    if (!row) {
+      console.log('[Twilio recording-status] no matching call_log for sid', sid);
+      return res.status(200).send('OK');
+    }
+    await fetch(`${admin.base}/api/database/records/call_logs?id=eq.${row.id}`, {
+      method: 'PATCH',
+      headers: { ...admin.headers(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recording_url: `${url}.mp3` }),
+    });
+    console.log('[Twilio recording-status] recording attached to log', row.id);
+    res.status(200).send('OK');
+  } catch (err) {
+    console.error('[Twilio recording-status] error:', err);
+    res.status(200).send('OK');
   }
 });
 

@@ -9,6 +9,7 @@ import { getInsforgeClient } from '../lib/insforge.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
+import { adminFetch } from './sms.js';
 
 const router = Router();
 
@@ -183,6 +184,20 @@ router.post('/amd-callback', express.urlencoded({ extended: false }), (req: Requ
     }
   } else if (status === 'human') {
     // Human answered — bridge the call to the rep's browser (normal connect flow)
+    // Stamp the parent CallSid onto the rep's latest outbound log so the
+    // recording-status callback can attach the recording to the right row.
+    if (repId && callSid) {
+      (async () => {
+        try {
+          const admin = await adminFetch();
+          await fetch(`${admin.base}/api/database/records/call_logs?user_id=eq.${repId}&direction=eq.outbound&order=created_at.desc&limit=1`, {
+            method: 'PATCH',
+            headers: { ...admin.headers(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ call_sid: callSid }),
+          });
+        } catch { /* best effort */ }
+      })();
+    }
     twiml.dial().client(`user_${repId}`);
   } else {
     // unknown/fax — safest is to bridge like a human; rep can drop manually
