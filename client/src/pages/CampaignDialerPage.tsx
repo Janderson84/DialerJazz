@@ -31,6 +31,7 @@ import { useLocalCalling } from '@/hooks/useLocalCalling';
 import CallControls from '@/components/CallControls';
 import InCallHUD from '@/components/InCallHUD';
 import DispositionOverlay from '@/components/DispositionOverlay';
+import { followupsApi } from '@/lib/api';
 import SmsAfterCallOverlay from '@/components/SmsAfterCallOverlay';
 
 type DialerMode = 'power' | 'click';
@@ -201,6 +202,26 @@ export default function CampaignDialerPage() {
     // Give the sheet a beat to close so the call UI takes over cleanly.
     setTimeout(() => handleDialForLead(currentLead), 150);
   }, [currentLead]);
+
+  // Schedule a callback for this lead, then dispose the attempt as follow_up
+  // so it's logged but the lead isn't lost.
+  const handleScheduleCallback = useCallback(async (dueAtIso: string, cbNotes: string) => {
+    if (!currentLead) return;
+    try {
+      await followupsApi.create({
+        lead_id: currentLead.id,
+        campaign_id: campaign?.id || undefined,
+        due_at: dueAtIso,
+        notes: cbNotes || undefined,
+      });
+      toast.success('Callback scheduled 🔔');
+      // Reuse the normal disposition path: log + dispose as follow_up.
+      await handleDisposition('Follow-up');
+    } catch (err) {
+      console.error('[CampaignDialer] schedule callback failed:', err);
+      toast.error('Could not schedule callback');
+    }
+  }, [currentLead, campaign?.id]);
 
   const handleHangUp = () => {
     voice.hangup();
@@ -584,6 +605,7 @@ export default function CampaignDialerPage() {
               {/* Post-Call Disposition Bottom Sheet */}
               <DispositionOverlay
                 onRedial={handleRedial}
+                onScheduleCallback={handleScheduleCallback}
                 visible={showDisposition}
                 dispositions={DISPOSITIONS}
                 isDisposing={isDisposing}

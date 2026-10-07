@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone, Users, Clock, Plus, Wifi, WifiOff, Loader2, FolderOpen, Wallet, CreditCard } from 'lucide-react';
+import { Phone, Users, Clock, Plus, Wifi, WifiOff, Loader2, FolderOpen, Wallet, CreditCard, CalendarClock, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import CampaignsTable from '@/components/CampaignsTable';
-import { campaignsApi, settingsApi, statsApi, type Campaign } from '@/lib/api';
+import { campaignsApi, settingsApi, statsApi, followupsApi, type Campaign, type FollowUp } from '@/lib/api';
 
 type TeamPulseRow = { rep_user_id: string; name: string; is_master: boolean; calls: number; connected: number; talk_secs: number };
 
@@ -18,6 +18,7 @@ export default function Dashboard() {
   const [isTelnyxConnected, setIsTelnyxConnected] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [teamPulse, setTeamPulse] = useState<TeamPulseRow[]>([]);
+  const [followUps, setFollowUps] = useState<FollowUp[]>([]);
 
   const fetchCampaigns = useCallback(async () => {
     try {
@@ -59,12 +60,31 @@ export default function Dashboard() {
     }
   }, [pulseRange]);
 
+  const fetchFollowUps = useCallback(async () => {
+    try {
+      const { data } = await followupsApi.list('open');
+      setFollowUps(data || []);
+    } catch {
+      // non-fatal
+    }
+  }, []);
+
   useEffect(() => {
     fetchCampaigns();
     fetchSettings();
     fetchStats();
     fetchTeamPulse();
-  }, [fetchCampaigns, fetchSettings, fetchStats, fetchTeamPulse]);
+    fetchFollowUps();
+  }, [fetchCampaigns, fetchSettings, fetchStats, fetchTeamPulse, fetchFollowUps]);
+
+  const completeFollowUp = async (id: string) => {
+    setFollowUps(prev => prev.filter(f => f.id !== id));
+    try { await followupsApi.update(id, { status: 'done' }); } catch { fetchFollowUps(); }
+  };
+  const dismissFollowUp = async (id: string) => {
+    setFollowUps(prev => prev.filter(f => f.id !== id));
+    try { await followupsApi.remove(id); } catch { fetchFollowUps(); }
+  };
 
   // Compute stats from real data
   const totalLeads = stats.totalLeads;
@@ -182,6 +202,64 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Callbacks (Follow-ups) Card */}
+        {followUps.length > 0 && (
+        <div className="bg-white dark:bg-[#0F0F12] rounded-xl p-6 border border-gray-200 dark:border-[#1F1F23]">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+            <CalendarClock className="w-4 h-4 text-sky-500" />
+            Callbacks due
+            <span className="text-xs font-semibold text-muted-foreground ml-1">{followUps.length}</span>
+          </h2>
+          <div className="space-y-2">
+            {followUps.slice(0, 6).map((f) => {
+              const due = new Date(f.due_at);
+              const overdue = due.getTime() < Date.now();
+              const dateStr = due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+              const timeStr = due.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+              return (
+                <div key={f.id} className={cn(
+                  'flex items-center gap-3 p-3 rounded-xl border transition-colors',
+                  overdue ? 'border-amber-500/40 bg-amber-500/5' : 'border-gray-200 dark:border-[#1F1F23]'
+                )}>
+                  <div className="flex flex-col items-center min-w-[52px]">
+                    <span className={cn('text-xs font-bold', overdue ? 'text-amber-500' : 'text-foreground')}>
+                      {overdue ? 'Now' : dateStr}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">{timeStr}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {f.notes ? (
+                      <p className="text-sm text-foreground truncate">{f.notes}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Callback</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => completeFollowUp(f.id)}
+                    title="Mark done"
+                    className="p-2 rounded-lg hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors"
+                  >
+                    <Check className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => dismissFollowUp(f.id)}
+                    title="Dismiss"
+                    className="p-2 rounded-lg hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              );
+            })}
+            {followUps.length > 6 && (
+              <p className="text-xs text-muted-foreground text-center pt-1">
+                +{followUps.length - 6} more scheduled
+              </p>
+            )}
+          </div>
+        </div>
+        )}
 
         {/* Team Pulse Card */}
         <div className="bg-white dark:bg-[#0F0F12] rounded-xl p-6 flex flex-col border border-gray-200 dark:border-[#1F1F23]">

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface DispositionOption {
@@ -14,6 +15,8 @@ interface DispositionOverlayProps {
   isDisposing: boolean;
   onSelect: (label: string) => void;
   onRedial?: () => void;
+  /** If set, shows a "Schedule callback" row: rep picks a time, fires with ISO due date + notes. */
+  onScheduleCallback?: (dueAtIso: string, notes: string) => void;
 }
 
 /**
@@ -26,7 +29,25 @@ export default function DispositionOverlay({
   isDisposing,
   onSelect,
   onRedial,
+  onScheduleCallback,
 }: DispositionOverlayProps) {
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduleWhen, setScheduleWhen] = useState('');
+  const [scheduleNotes, setScheduleNotes] = useState('');
+
+  useEffect(() => {
+    if (visible) {
+      setShowSchedule(false);
+      setScheduleWhen('');
+      setScheduleNotes('');
+    }
+  }, [visible]);
+
+  const submitSchedule = () => {
+    if (!scheduleWhen || !onScheduleCallback) return;
+    onScheduleCallback(new Date(scheduleWhen).toISOString(), scheduleNotes.trim());
+    setShowSchedule(false);
+  };
   const primaryDispositions = dispositions.filter((d) => d.primary);
   const secondaryDispositions = dispositions.filter((d) => !d.primary);
 
@@ -62,6 +83,67 @@ export default function DispositionOverlay({
                   <span className="text-sm font-bold">Redial now</span>
                   <span className="text-[11px] opacity-70">— call them right back</span>
                 </button>
+              </div>
+            )}
+            {onScheduleCallback && (
+              <div className="mb-4">
+                {!showSchedule ? (
+                  <button
+                    onClick={() => setShowSchedule(true)}
+                    disabled={isDisposing}
+                    className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl bg-sky-600/15 border border-sky-500/40 text-sky-400 hover:bg-sky-600/25 active:scale-[0.98] transition-all disabled:opacity-50"
+                  >
+                    <span className="text-lg">📅</span>
+                    <span className="text-sm font-bold">Schedule callback</span>
+                    <span className="text-[11px] opacity-70">— book a time to try again</span>
+                  </button>
+                ) : (
+                  <div className="p-4 rounded-2xl bg-muted border border-border space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-foreground">When should we call back?</span>
+                      <button onClick={() => setShowSchedule(false)} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {[
+                        { label: 'In 1 hour', hours: 1 },
+                        { label: 'Later today', hours: 4 },
+                        { label: 'Tomorrow AM', hours: 18 },
+                      ].map((q) => (
+                        <button
+                          key={q.label}
+                          onClick={() => setScheduleWhen(new Date(Date.now() + q.hours * 3600_000).toISOString().slice(0, 16))}
+                          className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                            scheduleWhen === new Date(Date.now() + q.hours * 3600_000).toISOString().slice(0, 16)
+                              ? 'bg-sky-600 text-white border-sky-600'
+                              : 'bg-background border-border text-muted-foreground hover:text-foreground'
+                          }`}
+                        >
+                          {q.label}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="datetime-local"
+                      value={scheduleWhen}
+                      onChange={(e) => setScheduleWhen(e.target.value)}
+                      className="w-full p-2.5 rounded-xl bg-background border border-border text-sm text-foreground"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Note for the callback (optional)"
+                      value={scheduleNotes}
+                      onChange={(e) => setScheduleNotes(e.target.value)}
+                      className="w-full p-2.5 rounded-xl bg-background border border-border text-sm text-foreground"
+                    />
+                    <button
+                      onClick={submitSchedule}
+                      disabled={!scheduleWhen}
+                      className="w-full p-3 rounded-xl bg-sky-600 text-white text-sm font-bold disabled:opacity-40 active:scale-[0.98] transition-all"
+                    >
+                      Save callback
+                    </button>
+                  </div>
+                )}
               </div>
             )}
             <div className="space-y-4">
