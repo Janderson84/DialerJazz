@@ -476,6 +476,9 @@ export interface FollowUp {
   status: 'open' | 'done';
   created_at: string;
   completed_at?: string | null;
+  lead_name?: string | null;
+  lead_phone?: string | null;
+  lead_company?: string | null;
 }
 
 export const followupsApi = {

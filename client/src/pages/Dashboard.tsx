@@ -229,11 +229,14 @@ export default function Dashboard() {
                     <span className="text-[11px] text-muted-foreground">{timeStr}</span>
                   </div>
                   <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {f.lead_name || f.lead_phone || 'Callback'}
+                    </p>
                     {f.notes ? (
-                      <p className="text-sm text-foreground truncate">{f.notes}</p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Callback</p>
-                    )}
+                      <p className="text-xs text-muted-foreground truncate">{f.notes}</p>
+                    ) : f.lead_phone && f.lead_name ? (
+                      <p className="text-xs text-muted-foreground">{f.lead_phone}</p>
+                    ) : null}
                   </div>
                   <button
                     onClick={() => completeFollowUp(f.id)}

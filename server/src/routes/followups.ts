@@ -22,13 +22,23 @@ router.get('/', requireAuth, async (req: Request & { user?: any }, res: Response
   try {
     const userId = req.user!.id;
     const client = getInsforgeClient(req.headers.authorization?.replace('Bearer ', ''));
-    let q = client.database.from('follow_ups').select('*').order('due_at', { ascending: true }).limit(200);
+    let q = client.database.from('follow_ups').select('*, leads(first_name, last_name, company, phone)').order('due_at', { ascending: true }).limit(200);
     const status = req.query.status === 'done' ? 'done' : 'open';
     q = q.eq('status', status);
     if (!isMaster(userId)) q = q.eq('user_id', userId);
     const { data, error } = await q;
     if (error) throw new Error(error.message);
-    res.json({ data: data || [] });
+    const rows = (data || []).map((r: any) => {
+      const lead = Array.isArray(r.leads) ? r.leads[0] : r.leads;
+      return {
+        ...r,
+        lead_name: lead ? [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.company || null : null,
+        lead_phone: lead?.phone || null,
+        lead_company: lead?.company || null,
+        leads: undefined,
+      };
+    });
+    res.json({ data: rows });
   } catch (e) { next(e); }
 });
 
