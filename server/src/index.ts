@@ -16,6 +16,7 @@ import statsRouter from './routes/stats.js';
 import callsRouter from './routes/calls.js';
 import telnyxRouter from './routes/telnyx.js';
 import twilioRouter, { startTranscriptPoller } from './routes/twilio.js';
+import followupsRouter from './routes/followups.js';
 import teamRouter from './routes/team.js';
 import voicemailRouter from './routes/voicemail.js';
 import pipedriveRouter from './routes/pipedrive.js';
@@ -105,6 +106,7 @@ app.use('/api/telnyx/token', strictLimiter);  // Extra protection on token gener
 app.use('/api/telnyx', telnyxRouter);
 app.use('/api/twilio/token', strictLimiter);  // Extra protection on token generation
 app.use('/api/twilio', twilioRouter);
+app.use('/api/followups', followupsRouter);
 app.use('/api/team', teamRouter);
 app.use('/api/voicemail', voicemailRouter);
 app.use('/api/pipedrive', pipedriveRouter);

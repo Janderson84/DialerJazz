@@ -13,6 +13,7 @@ interface DispositionOverlayProps {
   dispositions: DispositionOption[];
   isDisposing: boolean;
   onSelect: (label: string) => void;
+  onRedial?: () => void;
 }
 
 /**
@@ -24,6 +25,7 @@ export default function DispositionOverlay({
   dispositions,
   isDisposing,
   onSelect,
+  onRedial,
 }: DispositionOverlayProps) {
   const primaryDispositions = dispositions.filter((d) => d.primary);
   const secondaryDispositions = dispositions.filter((d) => !d.primary);
@@ -49,6 +51,19 @@ export default function DispositionOverlay({
               Select disposition to save and continue.
             </p>
 
+            {onRedial && (
+              <div className="mb-4">
+                <button
+                  onClick={onRedial}
+                  disabled={isDisposing}
+                  className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl bg-emerald-600/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-600/25 active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  <span className="text-lg">🔁</span>
+                  <span className="text-sm font-bold">Redial now</span>
+                  <span className="text-[11px] opacity-70">— call them right back</span>
+                </button>
+              </div>
+            )}
             <div className="space-y-4">
               {/* Primary Row */}
               <div className="grid grid-cols-3 gap-3">

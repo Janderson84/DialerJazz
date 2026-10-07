@@ -193,6 +193,15 @@ export default function CampaignDialerPage() {
 
   const handleDial = () => handleDialForLead(currentLead);
 
+  // Redial: after a call ends, dial the SAME lead right back — no disposition
+  // saved, no lead advanced. The sheet closes and the retry begins immediately.
+  const handleRedial = useCallback(() => {
+    if (!currentLead) return;
+    setShowDisposition(false);
+    // Give the sheet a beat to close so the call UI takes over cleanly.
+    setTimeout(() => handleDialForLead(currentLead), 150);
+  }, [currentLead]);
+
   const handleHangUp = () => {
     voice.hangup();
   };
@@ -574,6 +583,7 @@ export default function CampaignDialerPage() {
 
               {/* Post-Call Disposition Bottom Sheet */}
               <DispositionOverlay
+                onRedial={handleRedial}
                 visible={showDisposition}
                 dispositions={DISPOSITIONS}
                 isDisposing={isDisposing}

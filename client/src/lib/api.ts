@@ -465,3 +465,35 @@ export const smsApi = {
   deleteAutoReply: (id: string) =>
     apiFetch(`/sms/auto-replies/${id}`, { method: 'DELETE' }),
 };
+
+export interface FollowUp {
+  id: string;
+  user_id: string;
+  lead_id: string | null;
+  campaign_id: string | null;
+  due_at: string;
+  notes: string | null;
+  status: 'open' | 'done';
+  created_at: string;
+  completed_at?: string | null;
+}
+
+export const followupsApi = {
+  list: (status: 'open' | 'done' = 'open') =>
+    apiFetch<FollowUp[]>(`/followups?status=${status}`),
+
+  create: (body: { due_at: string; notes?: string; lead_id?: string; campaign_id?: string }) =>
+    apiFetch<FollowUp>('/followups', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  update: (id: string, patch: { status?: 'open' | 'done'; notes?: string; due_at?: string }) =>
+    apiFetch<FollowUp>(`/followups/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+
+  remove: (id: string) =>
+    apiFetch<{ deleted: boolean }>(`/followups/${id}`, { method: 'DELETE' }),
+};
