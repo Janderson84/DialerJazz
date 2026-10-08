@@ -366,11 +366,23 @@ async function attachTranscript(transcriptSid: string): Promise<void> {
   const sentences = await tr.json().catch(() => ({}));
   const text = (sentences?.sentences || []).map((s: any) => s.transcript || '').join(' ').trim();
   if (!text) return;
+  // Speaker-segmented form for the killer-calls scoring feed: each turn with
+  // speaker label + audio offset, so downstream scoring gets clean rep/prospect
+  // turns without re-diarization. Kept alongside the plain-text blob.
+  const segments = (sentences?.sentences || []).map((s: any) => ({
+    speaker: s.speaker ?? null,
+    text: (s.transcript || '').trim(),
+    offset_ms: typeof s.media_offset_ms === 'number' ? s.media_offset_ms : (s.offset_ms ?? null),
+  })).filter((seg: any) => seg.text);
   const admin = await adminFetch();
   await fetch(`${admin.base}/api/database/records/call_logs?transcription_sid=eq.${transcriptSid}`, {
     method: 'PATCH',
     headers: { ...admin.headers(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transcription: text.slice(0, 10000), transcription_status: 'completed' }),
+    body: JSON.stringify({
+      transcription: text.slice(0, 10000),
+      transcript_segments: segments.length ? JSON.stringify(segments.slice(0, 500)) : null,
+      transcription_status: 'completed',
+    }),
   });
   console.log(`[transcript-status] attached transcript for ${transcriptSid} (${text.length} chars)`);
 }
@@ -430,5 +442,134 @@ export function startTranscriptPoller(): void {
     } catch { /* non-fatal */ }
   }, 2 * 60 * 1000);
 }
+
+
+// ── Killer-calls scoring feed (read-only, for the KillerCalls agent) ──
+// GET /api/twilio/killer-calls/feed?since=<ISO>&rep=<uuid>&limit=<n>
+// Returns completed calls with disposition answered|follow_up|redial,
+// including recording proxy URLs + speaker-segmented transcripts.
+// Auth: X-KillerCalls-Key header must match KILLER_CALLS_FEED_KEY env,
+// OR a valid rep/master Bearer token (scoped to own rows).
+const FEED_DISPOSITIONS = ['answered', 'follow_up', 'redial'];
+
+router.get('/killer-calls/feed', async (req: Request, res: Response) => {
+  try {
+    const feedKey = process.env.KILLER_CALLS_FEED_KEY;
+    const providedKey = String(req.headers['x-killercalls-key'] || '');
+    const authHeader = req.headers.authorization || '';
+    let scopeUserId: string | null = null;
+    let authorized = false;
+
+    if (feedKey && providedKey && providedKey === feedKey) {
+      authorized = true; // full team scope
+    } else if (authHeader.startsWith('Bearer ')) {
+      // fall back to authenticated-user scope (rep sees own rows)
+      try {
+        const admin = await adminFetch();
+        const me = await fetch(`${admin.base}/api/auth/admin/sessions`, { method: 'HEAD' }).catch(() => null);
+        // Light-weight: decode JWT for user id (same pattern as requireAuth)
+        const jwt = authHeader.slice(7);
+        const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString());
+        if (payload?.sub) { scopeUserId = String(payload.sub); authorized = true; }
+      } catch { /* fall through */ }
+    }
+    if (!authorized) return res.status(401).json({ error: 'unauthorized' });
+
+    const since = String(req.query.since || '');
+    const sinceIso = since ? new Date(since).toISOString() : new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const limit = Math.min(Math.max(parseInt(String(req.query.limit || '100'), 10) || 100, 1), 500);
+
+    const admin = await adminFetch();
+    const filters = [
+      `status=eq.completed`,
+      `disposition=in.(${FEED_DISPOSITIONS.join(',')})`,
+      `started_at=gt.${sinceIso}`,
+      `order=started_at.asc`,
+      `limit=${limit}`,
+    ];
+    if (scopeUserId) filters.push(`user_id=eq.${scopeUserId}`);
+    if (req.query.rep) filters.push(`user_id=eq.${encodeURIComponent(String(req.query.rep))}`);
+    const url = `${admin.base}/api/database/records/call_logs?${filters.join('&')}`;
+    const r = await fetch(url, { headers: admin.headers() });
+    if (!r.ok) return res.status(502).json({ error: 'upstream_error' });
+    const data = await r.json();
+    const rows = (Array.isArray(data) ? data : data?.data || []) as any[];
+
+    const out = rows.map((row) => ({
+      id: row.id,
+      user_id: row.user_id,
+      lead_id: row.lead_id,
+      campaign_id: row.campaign_id,
+      direction: row.direction,
+      duration_seconds: row.duration_seconds,
+      disposition: row.disposition,
+      disposition_sub: row.disposition_sub,
+      notes: row.notes,
+      from_number: row.from_number,
+      to_number: row.to_number,
+      call_sid: row.call_sid,
+      started_at: row.started_at,
+      ended_at: row.ended_at,
+      recording_url: row.recording_url ? `${PUBLIC_BASE_URL()}/api/twilio/killer-calls/recording/${row.call_sid}` : null,
+      transcription: row.transcription || null,
+      transcript_segments: row.transcript_segments
+        ? (typeof row.transcript_segments === 'string' ? JSON.parse(row.transcript_segments) : row.transcript_segments)
+        : null,
+    }));
+
+    // Overlap hint: caller should re-poll from the last row's started_at minus
+    // 60s; we also advertise the server's now so the cursor is unambiguous.
+    res.json({
+      data: out,
+      cursor: {
+        since_next: out.length ? out[out.length - 1].started_at : sinceIso,
+        overlap_seconds: 60,
+        server_now: new Date().toISOString(),
+      },
+    });
+  } catch (err: any) {
+    console.error('[killer-calls/feed] error:', err?.message);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// ── Recording proxy (authenticated Twilio media → stream) ───────────
+// GET /api/twilio/killer-calls/recording/:callSid
+router.get('/killer-calls/recording/:callSid', async (req: Request, res: Response) => {
+  try {
+    const feedKey = process.env.KILLER_CALLS_FEED_KEY;
+    const providedKey = String(req.headers['x-killercalls-key'] || '');
+    const authHeader = req.headers.authorization || '';
+    const authorized = (feedKey && providedKey === feedKey) || authHeader.startsWith('Bearer ');
+    if (!authorized) return res.status(401).json({ error: 'unauthorized' });
+
+    const master = await getMasterTwilioSettings();
+    const acct = master?.twilio_account_sid || '';
+    const tok = master?.twilio_auth_token || '';
+    if (!acct || !tok) return res.status(503).json({ error: 'no_twilio_creds' });
+
+    // Find the recording SID for this call
+    const listRes = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${acct}/Recordings.json?CallSid=${encodeURIComponent(String(req.params.callSid))}&PageSize=5`,
+      { headers: { Authorization: 'Basic ' + Buffer.from(`${acct}:${tok}`).toString('base64') } }
+    );
+    if (!listRes.ok) return res.status(502).json({ error: 'twilio_list_failed' });
+    const list = await listRes.json();
+    const rec = list?.recordings?.[0];
+    if (!rec) return res.status(404).json({ error: 'no_recording' });
+
+    const media = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${acct}/Recordings/${rec.sid}.mp3?Download=true`, {
+      headers: { Authorization: 'Basic ' + Buffer.from(`${acct}:${tok}`).toString('base64') },
+    });
+    if (!media.ok || !media.body) return res.status(502).json({ error: 'twilio_media_failed' });
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    const buf = Buffer.from(await media.arrayBuffer());
+    res.send(buf);
+  } catch (err: any) {
+    console.error('[killer-calls/recording] error:', err?.message);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
 
 export default router;

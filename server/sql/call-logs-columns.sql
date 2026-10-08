@@ -5,3 +5,4 @@ ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS transcription_sid text;
 ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS transcription_status text;
 ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS transcription text;
 CREATE INDEX IF NOT EXISTS idx_call_logs_call_sid ON call_logs(call_sid);
+ALTER TABLE call_logs ADD COLUMN IF NOT EXISTS transcript_segments jsonb;
