@@ -243,6 +243,9 @@ router.post('/send', requireAuth, async (req: AuthenticatedRequest, res, next) =
     }
 
     const fromNumber = await senderNumberFor(userId);
+    if (fromNumber && fromNumber === toE164) {
+      throw new ApiError(400, 'Cannot send a text to the same number it is sent from', 'same_number');
+    }
     const { sid, token } = await twilioCreds();
 
     const twRes = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
