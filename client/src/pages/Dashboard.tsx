@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone, Users, Clock, Plus, Wifi, WifiOff, Loader2, FolderOpen, Wallet, CreditCard, CalendarClock, Check, X } from 'lucide-react';
+import { Phone, Users, Clock, Plus, Wifi, WifiOff, Loader2, FolderOpen, Wallet, CreditCard, CalendarClock, Check, X, PhoneCall } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import CampaignsTable from '@/components/CampaignsTable';
@@ -238,6 +238,15 @@ export default function Dashboard() {
                       <p className="text-xs text-muted-foreground">{f.lead_phone}</p>
                     ) : null}
                   </div>
+                  {f.lead_phone && (
+                    <button
+                      onClick={() => navigate(`/dialer?tel=${encodeURIComponent(f.lead_phone!)}`)}
+                      title="Call now"
+                      className="p-2 rounded-lg hover:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-colors"
+                    >
+                      <PhoneCall className="w-4 h-4" />
+                    </button>
+                  )}
                   <button
                     onClick={() => completeFollowUp(f.id)}
                     title="Mark done"
