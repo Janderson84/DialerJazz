@@ -199,9 +199,28 @@ export default function CampaignDialerPage() {
   const handleRedial = useCallback(() => {
     if (!currentLead) return;
     setShowDisposition(false);
+    // Record the abandoned attempt as a 'redial' disposition: it shows in
+    // history + Pipedrive, but the lead stays in rotation (status 'calling').
+    const redialLead = currentLead;
+    const redialDuration = typeof voice.primaryCallDuration === 'number' ? voice.primaryCallDuration : 0;
+    void (async () => {
+      try {
+        await callsApi.log({
+          lead_id: redialLead.id,
+          campaign_id: campaign?.id || '',
+          duration_seconds: redialDuration,
+          status: 'completed',
+          disposition: 'redial',
+          provider: campaign?.provider || 'twilio',
+        });
+        await leadsApi.updateDisposition(redialLead.id, 'calling');
+      } catch (err) {
+        console.error('[CampaignDialer] redial log failed:', err);
+      }
+    })();
     // Give the sheet a beat to close so the call UI takes over cleanly.
-    setTimeout(() => handleDialForLead(currentLead), 150);
-  }, [currentLead]);
+    setTimeout(() => handleDialForLead(redialLead), 150);
+  }, [currentLead, campaign?.id, voice.primaryCallDuration]);
 
   // Schedule a callback for this lead, then dispose the attempt as follow_up
   // so it's logged but the lead isn't lost.
