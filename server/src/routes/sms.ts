@@ -156,7 +156,21 @@ router.get('/templates', requireAuth, async (req: AuthenticatedRequest, res, nex
     );
     if (!res2.ok) throw new ApiError(500, 'Failed to load templates', 'db_error');
     const data = await res2.json();
-    res.json({ data: Array.isArray(data) ? data : data?.data || [] });
+    let rows = Array.isArray(data) ? data : data?.data || [];
+    // Reps start with an empty template list — fall back to the master's
+    // templates so they have something to send on day one. Master's rows
+    // are marked shared: edits/deletes stay scoped to the owner's rows.
+    if (rows.length === 0 && req.user!.id !== MASTER_ID()) {
+      const mres = await fetch(
+        `${admin.base}/api/database/records/sms_templates?user_id=eq.${MASTER_ID()}&order=updated_at.desc`,
+        { headers: admin.headers() }
+      );
+      if (mres.ok) {
+        const mdata = await mres.json();
+        rows = (Array.isArray(mdata) ? mdata : mdata?.data || []).map((t: any) => ({ ...t, shared: true }));
+      }
+    }
+    res.json({ data: rows });
   } catch (e) { next(e); }
 });
 
