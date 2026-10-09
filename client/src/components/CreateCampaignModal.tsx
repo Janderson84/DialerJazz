@@ -123,6 +123,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onCreated }: Prop
   // CSV State
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
@@ -649,20 +650,43 @@ export default function CreateCampaignModal({ isOpen, onClose, onCreated }: Prop
         {/* Step 3b: Upload CSV */}
         {step === 'upload_csv' && (
           <div className="space-y-6">
-            <div 
-              className="border-2 border-dashed border-zinc-700 hover:border-foreground/50 rounded-2xl p-10 text-center transition-colors bg-muted cursor-pointer"
+            <div
+              className={`border-2 border-dashed rounded-2xl p-10 text-center transition-colors cursor-pointer ${
+                isDragOver
+                  ? 'border-foreground bg-foreground/5 scale-[1.01]'
+                  : 'border-zinc-700 hover:border-foreground/50 bg-muted'
+              }`}
               onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragOver(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                setIsDragOver(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOver(false);
+                const f = e.dataTransfer.files?.[0];
+                if (!f) return;
+                if (!/\.csv$/i.test(f.name)) {
+                  toast.error('Please drop a .csv file');
+                  return;
+                }
+                setCsvFile(f);
+              }}
             >
-              <input 
-                type="file" 
-                accept=".csv" 
-                ref={fileInputRef} 
-                className="hidden" 
+              <input
+                type="file"
+                accept=".csv"
+                ref={fileInputRef}
+                className="hidden"
                 onChange={handleFileChange}
               />
-              <Upload className="h-10 w-10 text-muted-foreground text-opacity-70 mx-auto mb-4" />
+              <Upload className={`h-10 w-10 mx-auto mb-4 transition-colors ${isDragOver ? 'text-foreground' : 'text-muted-foreground text-opacity-70'}`} />
               <p className="text-foreground font-medium mb-1">
-                {csvFile ? csvFile.name : 'Click to upload your CSV'}
+                {csvFile ? csvFile.name : 'Drag & drop your CSV here, or click to browse'}
               </p>
               <p className="text-sm text-muted-foreground text-opacity-70">
                 Supports exports from Apollo, ZoomInfo, Uplead, and any standard CSV.
