@@ -241,6 +241,7 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
           direction: meta.direction,
           to_number: meta.to_number || null,
           from_number: meta.from_number || null,
+          call_sid: (call as any)?.parameters?.CallSid || null,
         };
         debugLog('[TwilioContext] Auto-logging call:', payload);
         callsApi.log(payload).catch((err) => console.error('[TwilioContext] Auto-log failed:', err));

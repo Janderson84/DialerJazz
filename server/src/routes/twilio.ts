@@ -369,10 +369,12 @@ async function attachTranscript(transcriptSid: string): Promise<void> {
   // Speaker-segmented form for the killer-calls scoring feed: each turn with
   // speaker label + audio offset, so downstream scoring gets clean rep/prospect
   // turns without re-diarization. Kept alongside the plain-text blob.
+  // Intelligence doesn't return speaker labels — but dual-channel recordings
+  // tag each sentence with media_channel (1 = rep leg, 2 = prospect leg).
   const segments = (sentences?.sentences || []).map((s: any) => ({
-    speaker: s.speaker ?? null,
+    speaker: s.media_channel === 1 ? 'rep' : s.media_channel === 2 ? 'prospect' : (s.speaker ?? null),
     text: (s.transcript || '').trim(),
-    offset_ms: typeof s.media_offset_ms === 'number' ? s.media_offset_ms : (s.offset_ms ?? null),
+    offset_ms: s.start_time != null ? Math.round(parseFloat(s.start_time) * 1000) : null,
   })).filter((seg: any) => seg.text);
   const admin = await adminFetch();
   await fetch(`${admin.base}/api/database/records/call_logs?transcription_sid=eq.${transcriptSid}`, {

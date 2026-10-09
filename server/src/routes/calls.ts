@@ -18,6 +18,7 @@ const callLogSchema = z.object({
   direction: z.enum(['outbound', 'inbound']).default('outbound'),
   to_number: z.string().max(40).optional().nullable(),
   from_number: z.string().max(40).optional().nullable(),
+  call_sid: z.string().max(64).optional().nullable(),
 });
 
 // POST /api/calls/log
@@ -63,6 +64,7 @@ router.post('/log', requireAuth, async (req: AuthenticatedRequest, res, next) =>
         direction: validated.direction,
         to_number: validated.to_number || null,
         from_number: validated.from_number || null,
+        call_sid: validated.call_sid || null,
         started_at: new Date().toISOString(),
         ended_at: new Date().toISOString(),
       })

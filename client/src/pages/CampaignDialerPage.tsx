@@ -212,6 +212,7 @@ export default function CampaignDialerPage() {
           status: 'completed',
           disposition: 'redial',
           provider: campaign?.provider || 'twilio',
+          call_sid: (voice.primaryCall as any)?.parameters?.CallSid || null,
         });
         await leadsApi.updateDisposition(redialLead.id, 'calling');
       } catch (err) {
@@ -266,6 +267,7 @@ export default function CampaignDialerPage() {
         disposition: dispValue,
         notes: notes,
         provider: campaign?.provider || 'twilio',
+        call_sid: (voice.primaryCall as any)?.parameters?.CallSid || null,
       });
       
       // Update lead status so it won't appear on refresh
