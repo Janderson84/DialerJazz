@@ -59,16 +59,16 @@ export default function DispositionOverlay({
           animate={{ y: 0 }}
           exit={{ y: '100%', opacity: 0 }}
           transition={{ type: 'spring', bounce: 0, duration: 0.4 }}
-          className="absolute inset-x-0 bottom-0 top-[30%] bg-surface backdrop-blur-md rounded-t-[2.5rem] border-t-2 border-border z-50 shadow-[0_-20px_50px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden"
+          className="absolute inset-x-0 bottom-0 top-[22%] bg-surface backdrop-blur-md rounded-t-[2.5rem] border-t-2 border-border z-50 shadow-[0_-20px_50px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden"
         >
           {/* Pull handle */}
           <div className="w-16 h-1.5 bg-white/20 rounded-full mx-auto mt-4 mb-6" />
 
-          <div className="px-6 flex-1 flex flex-col">
+          <div className="px-6 flex-1 flex flex-col overflow-y-auto min-h-0">
             <h3 className="text-xl font-extrabold text-foreground mb-2 text-center">
               What's the outcome?
             </h3>
-            <p className="text-muted-foreground text-sm text-center mb-8">
+            <p className="text-muted-foreground text-sm text-center mb-4">
               Select disposition to save and continue.
             </p>
 
@@ -77,9 +77,9 @@ export default function DispositionOverlay({
                 <button
                   onClick={onRedial}
                   disabled={isDisposing}
-                  className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl bg-emerald-600/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-600/25 active:scale-[0.98] transition-all disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-2xl bg-emerald-600/15 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-600/25 active:scale-[0.98] transition-all disabled:opacity-50"
                 >
-                  <span className="text-lg">🔁</span>
+                  <span className="text-base">🔁</span>
                   <span className="text-sm font-bold">Redial now</span>
                   <span className="text-[11px] opacity-70">— call them right back</span>
                 </button>
@@ -91,9 +91,9 @@ export default function DispositionOverlay({
                   <button
                     onClick={() => setShowSchedule(true)}
                     disabled={isDisposing}
-                    className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl bg-sky-600/15 border border-sky-500/40 text-sky-400 hover:bg-sky-600/25 active:scale-[0.98] transition-all disabled:opacity-50"
+                    className="w-full flex items-center justify-center gap-2 p-2.5 rounded-2xl bg-sky-600/15 border border-sky-500/40 text-sky-400 hover:bg-sky-600/25 active:scale-[0.98] transition-all disabled:opacity-50"
                   >
-                    <span className="text-lg">📅</span>
+                    <span className="text-base">📅</span>
                     <span className="text-sm font-bold">Schedule callback</span>
                     <span className="text-[11px] opacity-70">— book a time to try again</span>
                   </button>
@@ -154,7 +154,7 @@ export default function DispositionOverlay({
                     key={d.label}
                     onClick={() => onSelect(d.label)}
                     disabled={isDisposing}
-                    className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl bg-muted border border-border hover:bg-muted hover:bg-muted/80 active:scale-95 transition-all disabled:opacity-50"
+                    className="flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl bg-muted border border-border hover:bg-muted hover:bg-muted/80 active:scale-95 transition-all disabled:opacity-50"
                   >
                     <span className="text-2xl">{d.emoji}</span>
                     <span className="text-xs font-bold text-foreground text-center leading-tight">
@@ -165,7 +165,7 @@ export default function DispositionOverlay({
               </div>
               <div className="h-px w-full bg-muted my-2" />
               {/* Secondary Row */}
-              <div className="grid grid-cols-3 gap-3 flex-1 pb-6">
+              <div className="grid grid-cols-3 gap-3 pb-4">
                 {secondaryDispositions.map((d) => (
                   <button
                     key={d.label}
