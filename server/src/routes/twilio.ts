@@ -239,7 +239,16 @@ router.post('/dial-status', express.urlencoded({ extended: false }), async (req:
         // parent CallSid) can be matched back to this log row.
         const dialSid = req.body.DialCallSid || req.body.CallSid || '';
         if (dialSid) {
-          await fetch(`${admin.base}/api/database/records/call_logs?user_id=eq.${repId}&direction=eq.outbound&order=created_at.desc&limit=1`, {
+          // Prefer the newest outbound row to the SAME number within the last
+          // 30 min (exact match), falling back to the newest outbound row.
+          const cleanTo = to.replace(/[^\d+]/g, '');
+          const match = await fetch(
+            `${admin.base}/api/database/records/call_logs?user_id=eq.${repId}&direction=eq.outbound&to_number=like.*${encodeURIComponent(cleanTo.slice(-10))}*&order=created_at.desc&limit=1`,
+            { headers: admin.headers() }
+          ).then(r => r.json()).catch(() => null);
+          const row = (Array.isArray(match) ? match : match?.data || [])[0];
+          const idFilter = row?.id ? `id=eq.${row.id}` : `user_id=eq.${repId}&direction=eq.outbound&order=created_at.desc&limit=1`;
+          await fetch(`${admin.base}/api/database/records/call_logs?${idFilter}`, {
             method: 'PATCH',
             headers: { ...admin.headers(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ call_sid: dialSid }),
