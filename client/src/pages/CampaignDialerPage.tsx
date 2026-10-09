@@ -185,7 +185,13 @@ export default function CampaignDialerPage() {
       return;
     }
 
-    if (!voice.sipConfigured) return toast.error('Configure a telephony provider in Connectors first.');
+    if (!voice.sipConfigured) {
+      // If setup actually failed (mic blocked, bad creds), show the real
+      // reason instead of pointing the rep at Connectors.
+      const realError = voice.error;
+      if (realError) return toast.error(realError, { duration: 8000 });
+      return toast.error('Configure a telephony provider in Connectors first.');
+    }
     if (voice.connectionStatus !== 'registered') return toast.error('Connecting...');
     // autoLog:false — this page logs the call itself with lead_id (attempt
     // counter); the context-level auto-log would double-log the call.

@@ -360,6 +360,9 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         probeStream.getTracks().forEach((t) => t.stop());
       } catch (micErr: any) {
         console.error('[TwilioContext] Microphone probe failed:', micErr);
+        // Reset the connection state — without this the badge hangs on
+        // "Connecting" forever and the dial gate reports the wrong problem.
+        setConnectionStatus('disconnected');
         setError(
           'Microphone blocked. Click the icon at the left of the address bar, set Microphone to Allow, then reload and dial again.'
         );

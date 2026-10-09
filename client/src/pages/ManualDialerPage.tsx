@@ -65,7 +65,11 @@ export default function ManualDialerPage() {
   }, [searchParams, setSearchParams]);
 
   const handleDial = () => {
-    if (!voice.sipConfigured) return toast.error('Configure a telephony provider in Connectors first.');
+    if (!voice.sipConfigured) {
+      const realError = voice.error;
+      if (realError) return toast.error(realError, { duration: 8000 });
+      return toast.error('Configure a telephony provider in Connectors first.');
+    }
     if (voice.connectionStatus !== 'registered') return toast.error('Connecting...');
     if (numberInput.trim() === '') return toast.error('Please enter a phone number to call.');
     dialedNumberRef.current = numberInput.trim();
