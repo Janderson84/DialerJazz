@@ -249,7 +249,7 @@ router.post('/dial-status', express.urlencoded({ extended: false }), async (req:
           // 30 min (exact match), falling back to the newest outbound row.
           const cleanTo = to.replace(/[^\d+]/g, '');
           const match = await fetch(
-            `${admin.base}/api/database/records/call_logs?user_id=eq.${repId}&direction=eq.outbound&to_number=like.*${encodeURIComponent(cleanTo.slice(-10))}*&order=created_at.desc&limit=1`,
+            `${admin.base}/api/database/records/call_logs?user_id=eq.${repId}&direction=eq.outbound&to_number=like.*${encodeURIComponent(cleanTo.slice(-10))}*&created_at=gte.${encodeURIComponent(new Date(Date.now() - 10 * 60 * 1000).toISOString())}&order=created_at.desc&limit=1`,
             { headers: admin.headers() }
           ).then(r => r.json()).catch(() => null);
           const row = (Array.isArray(match) ? match : match?.data || [])[0];
