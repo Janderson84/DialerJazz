@@ -155,6 +155,8 @@ router.post('/voice', express.urlencoded({ extended: false }), async (req: Reque
         record: 'record-from-answer-dual',
         recordingStatusCallback: `${PUBLIC_BASE_URL()}/api/twilio/recording-status?rep=${attributionId}`,
         recordingStatusCallbackEvent: 'completed',
+        action: `${PUBLIC_BASE_URL()}/api/twilio/dial-status?rep=${attributionId}&from=${encodeURIComponent(outboundCallerId)}&to=${encodeURIComponent(clean)}&outbound=1`,
+        method: 'POST',
       } as any);
       amd.number({
         url: `${PUBLIC_BASE_URL()}/api/voicemail/amd-callback?rep=${attributionId}`,
@@ -230,9 +232,13 @@ router.post('/dial-status', express.urlencoded({ extended: false }), async (req:
     const duration = Number(req.body.DialCallDuration || req.body.AnsweredBy || 0) || 0;
     console.log(`[Twilio dial-status] rep=${repId} from=${from} to=${to} status=${status} dur=${duration}`);
 
-    // Log the inbound call to history (was missing entirely: inbound calls
-    // never appeared in Call Logs). owner = rep if valid, else master.
-    if (/^[0-9a-f-]{36}$/i.test(repId) && from && to) {
+    const isOutbound = req.query.outbound === '1';
+
+    // Attach the Twilio CallSid to the matching log row. For OUTBOUND calls
+    // (rep dialed from the app) this completes the recording/transcript chain
+    // server-side, even if the client never sent call_sid. For INBOUND calls
+    // we also log the call to history (was missing entirely).
+    if (/^[0-9a-f-]{36}$/i.test(repId) && (isOutbound || (from && to))) {
       try {
         const admin = await adminFetch();
         // Attach the Twilio CallSid so recordings (which callback with the
@@ -253,6 +259,12 @@ router.post('/dial-status', express.urlencoded({ extended: false }), async (req:
             headers: { ...admin.headers(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ call_sid: dialSid }),
           }).catch(() => {});
+        }
+        // Outbound calls are logged by the client (disposition path) — don't
+        // double-log; this callback only stamps the CallSid.
+        if (isOutbound) {
+          res.status(200).send('OK');
+          return;
         }
         const logBody = {
           user_id: repId,
