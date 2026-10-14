@@ -545,6 +545,17 @@ router.get('/killer-calls/feed', async (req: Request, res: Response) => {
     const limit = Math.min(Math.max(parseInt(String(req.query.limit || '100'), 10) || 100, 1), 500);
 
     const admin = await adminFetch();
+
+    // Rep display names for the killer-calls leaderboard (uuid → name).
+    const repNames: Record<string, string> = {};
+    try {
+      const tm = await fetch(`${admin.base}/api/database/records/team_members?select=rep_user_id,display_name`, { headers: admin.headers() }).then(r => r.json());
+      for (const m of (Array.isArray(tm) ? tm : tm?.data || []) as any[]) {
+        if (m?.rep_user_id && m?.display_name) repNames[String(m.rep_user_id)] = String(m.display_name);
+      }
+      repNames[MASTER_ID()] = repNames[MASTER_ID()] || 'James';
+    } catch { /* names optional */ }
+
     const filters = [
       `status=eq.completed`,
       `disposition=in.(${FEED_DISPOSITIONS.join(',')})`,
@@ -563,6 +574,7 @@ router.get('/killer-calls/feed', async (req: Request, res: Response) => {
     const out = rows.map((row) => ({
       id: row.id,
       user_id: row.user_id,
+      rep_name: repNames[String(row.user_id)] || null,
       lead_id: row.lead_id,
       campaign_id: row.campaign_id,
       direction: row.direction,
