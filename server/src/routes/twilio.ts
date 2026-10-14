@@ -254,10 +254,28 @@ router.post('/dial-status', express.urlencoded({ extended: false }), async (req:
           ).then(r => r.json()).catch(() => null);
           const row = (Array.isArray(match) ? match : match?.data || [])[0];
           const idFilter = row?.id ? `id=eq.${row.id}` : `user_id=eq.${repId}&direction=eq.outbound&order=created_at.desc&limit=1`;
+          // Store the PARENT call sid — the client reports the dial-leg (child)
+          // sid, but recordings/transcripts callback with the parent. Resolve
+          // via Twilio (best effort); fall back to the child sid.
+          let sidToStore = dialSid;
+          try {
+            const master = await getMasterTwilioSettings();
+            const acct = master?.twilio_account_sid || '';
+            const tok = master?.twilio_auth_token || '';
+            if (acct && tok) {
+              const cr = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${acct}/Calls/${encodeURIComponent(dialSid)}.json`, {
+                headers: { Authorization: 'Basic ' + Buffer.from(`${acct}:${tok}`).toString('base64') },
+              });
+              if (cr.ok) {
+                const call = await cr.json();
+                if (call?.parent_call_sid) sidToStore = String(call.parent_call_sid);
+              }
+            }
+          } catch { /* keep child sid */ }
           await fetch(`${admin.base}/api/database/records/call_logs?${idFilter}`, {
             method: 'PATCH',
             headers: { ...admin.headers(), 'Content-Type': 'application/json' },
-            body: JSON.stringify({ call_sid: dialSid }),
+            body: JSON.stringify({ call_sid: sidToStore }),
           }).catch(() => {});
         }
         // Outbound calls are logged by the client (disposition path) — don't
@@ -318,8 +336,32 @@ router.post('/recording-status', express.urlencoded({ extended: false }), async 
     console.log(`[Twilio recording-status] sid=${sid} dur=${duration} url=${url.slice(0, 80)}`);
     if (!sid || !url) return res.status(200).send('OK');
     const admin = await adminFetch();
-    const found = await fetch(`${admin.base}/api/database/records/call_logs?call_sid=eq.${encodeURIComponent(sid)}&select=id&limit=1`, { headers: admin.headers() }).then(r => r.json());
-    const row = (Array.isArray(found) ? found : found?.data || [])[0];
+    const findRow = async (s: string) => {
+      const found = await fetch(`${admin.base}/api/database/records/call_logs?call_sid=eq.${encodeURIComponent(s)}&select=id&limit=1`, { headers: admin.headers() }).then(r => r.json());
+      return (Array.isArray(found) ? found : found?.data || [])[0];
+    };
+    let row = await findRow(sid);
+    if (!row) {
+      // The client logs the DIAL leg's sid; recordings callback with the
+      // PARENT call sid. Resolve the parent via Twilio and retry.
+      try {
+        const master = await getMasterTwilioSettings();
+        const acct = master?.twilio_account_sid || '';
+        const tok = master?.twilio_auth_token || '';
+        if (acct && tok) {
+          const cr = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${acct}/Calls/${encodeURIComponent(sid)}.json`, {
+            headers: { Authorization: 'Basic ' + Buffer.from(`${acct}:${tok}`).toString('base64') },
+          });
+          if (cr.ok) {
+            const call = await cr.json();
+            if (call?.parent_call_sid) {
+              row = await findRow(String(call.parent_call_sid));
+              if (row) console.log('[Twilio recording-status] matched via parent sid');
+            }
+          }
+        }
+      } catch { /* fall through */ }
+    }
     if (!row) {
       console.log('[Twilio recording-status] no matching call_log for sid', sid);
       return res.status(200).send('OK');
