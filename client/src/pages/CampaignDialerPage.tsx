@@ -31,7 +31,7 @@ import { useLocalCalling } from '@/hooks/useLocalCalling';
 import CallControls from '@/components/CallControls';
 import InCallHUD from '@/components/InCallHUD';
 import DispositionOverlay from '@/components/DispositionOverlay';
-import { followupsApi } from '@/lib/api';
+import { followupsApi, type FollowUp } from '@/lib/api';
 import SmsAfterCallOverlay from '@/components/SmsAfterCallOverlay';
 
 type DialerMode = 'power' | 'click';
@@ -66,6 +66,7 @@ export default function CampaignDialerPage() {
   const [showDisposition, setShowDisposition] = useState(false);
   const [isDisposing, setIsDisposing] = useState(false);
   const [showSmsAfterCall, setShowSmsAfterCall] = useState(false);
+  const [overdueCallbacks, setOverdueCallbacks] = useState<FollowUp[]>([]);
   const [pendingSmsLead, setPendingSmsLead] = useState<{ id: string; name: string; phone: string } | null>(null);
   const smsThenAdvanceRef = useRef<(() => void) | null>(null);
   const [showDTMF, setShowDTMF] = useState(false);
@@ -121,6 +122,11 @@ export default function CampaignDialerPage() {
 
   useEffect(() => {
     loadData();
+    followupsApi.list('open')
+      .then(({ data }) => {
+        setOverdueCallbacks((data || []).filter((f) => new Date(f.due_at).getTime() < Date.now()));
+      })
+      .catch(() => {});
   }, [loadData]);
 
   // Track this route for the ActiveCallBubble (so it knows where to return).
@@ -487,6 +493,26 @@ export default function CampaignDialerPage() {
 
       {/* Center - Swiping Deck Container */}
       <main className="flex-1 relative flex items-center justify-center -mt-6">
+        {overdueCallbacks.length > 0 && (
+          <div className="absolute top-2 inset-x-4 z-40 bg-amber-500/15 border border-amber-500/30 rounded-xl px-4 py-2.5 flex items-center gap-2 text-sm backdrop-blur">
+            <span className="text-base">⏰</span>
+            <span className="text-amber-600 dark:text-amber-400 font-semibold">
+              {overdueCallbacks.length} callback{overdueCallbacks.length > 1 ? 's' : ''} overdue
+            </span>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="ml-auto text-xs underline text-amber-600 dark:text-amber-400 hover:opacity-80"
+            >
+              View
+            </button>
+            <button
+              onClick={() => setOverdueCallbacks([])}
+              className="text-muted-foreground hover:text-foreground text-xs px-1"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         
         {/* Background Hint layer */}
         <div className="absolute inset-0 flex items-center justify-between px-10 pointer-events-none opacity-20">
