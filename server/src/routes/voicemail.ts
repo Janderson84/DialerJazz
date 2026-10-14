@@ -6,9 +6,9 @@ import { spawn } from 'child_process';
 import twilio from 'twilio';
 import express from 'express';
 import { getInsforgeClient } from '../lib/insforge.js';
+import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
 import { adminFetch } from './sms.js';
 
 const router = Router();
@@ -198,12 +198,26 @@ router.post('/amd-callback', express.urlencoded({ extended: false }), (req: Requ
         } catch { /* best effort */ }
       })();
     }
-    twiml.dial().client(`user_${repId}`);
+    bridgeToRep(twiml, repId);
   } else {
     // unknown/fax — safest is to bridge like a human; rep can drop manually
-    twiml.dial().client(`user_${repId}`);
+    bridgeToRep(twiml, repId);
   }
   res.type('text/xml').send(twiml.toString());
 });
+
+// Bridge to the rep's browser with a timeout + voicemail fallback. Without a
+// timeout, an unreachable browser client (tab asleep, reloaded mid-dial,
+// network blip) leaves Twilio hanging until it errors out — reps hear
+// "application error has occurred" after a few rings.
+function bridgeToRep(twiml: twilio.twiml.VoiceResponse, repId: string): void {
+  const target = `user_${/^[0-9a-f-]{36}$/i.test(repId || '') ? repId : MASTER_ID()}`;
+  const dial = twiml.dial({
+    timeout: 25,
+    callerId: undefined,
+  } as any);
+  dial.client(target);
+  twiml.say('The person you are calling is unavailable. Please leave a message after the tone.');
+}
 
 export default router;
