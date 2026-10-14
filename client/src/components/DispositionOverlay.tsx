@@ -17,6 +17,9 @@ interface DispositionOverlayProps {
   onRedial?: () => void;
   /** If set, shows a "Schedule callback" row: rep picks a time, fires with ISO due date + notes. */
   onScheduleCallback?: (dueAtIso: string, notes: string) => void;
+  /** Lead display name + company shown under the header so the rep knows who they just spoke with. */
+  leadName?: string;
+  leadCompany?: string;
 }
 
 /**
@@ -30,6 +33,8 @@ export default function DispositionOverlay({
   onSelect,
   onRedial,
   onScheduleCallback,
+  leadName,
+  leadCompany,
 }: DispositionOverlayProps) {
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleWhen, setScheduleWhen] = useState('');
@@ -65,9 +70,16 @@ export default function DispositionOverlay({
           <div className="w-16 h-1.5 bg-white/20 rounded-full mx-auto mt-4 mb-6" />
 
           <div className="px-6 flex-1 flex flex-col overflow-y-auto min-h-0">
-            <h3 className="text-xl font-extrabold text-foreground mb-2 text-center">
+            <h3 className="text-xl font-extrabold text-foreground mb-1 text-center">
               What's the outcome?
             </h3>
+            {(leadName || leadCompany) && (
+              <p className="text-sm text-center mb-1">
+                {leadName && <span className="font-semibold text-foreground">{leadName}</span>}
+                {leadName && leadCompany && <span className="text-muted-foreground"> · </span>}
+                {leadCompany && <span className="text-muted-foreground font-medium">{leadCompany}</span>}
+              </p>
+            )}
             <p className="text-muted-foreground text-sm text-center mb-4">
               Select disposition to save and continue.
             </p>

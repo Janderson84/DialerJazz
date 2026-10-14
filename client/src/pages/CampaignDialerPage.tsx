@@ -633,6 +633,8 @@ export default function CampaignDialerPage() {
               <DispositionOverlay
                 onRedial={handleRedial}
                 onScheduleCallback={handleScheduleCallback}
+                leadName={currentLead ? [currentLead.first_name, currentLead.last_name].filter(Boolean).join(' ') || '' : ''}
+                leadCompany={currentLead?.company || ''}
                 visible={showDisposition}
                 dispositions={DISPOSITIONS}
                 isDisposing={isDisposing}
