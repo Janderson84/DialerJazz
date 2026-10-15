@@ -375,6 +375,11 @@ router.post('/recording-status', express.urlencoded({ extended: false }), async 
 
     // Fire-and-forget: create a Twilio Intelligence transcript for this
     // recording (uses the master account; no extra API key needed).
+    // Skip ultra-short recordings (< 5s) — Intelligence errors on them.
+    if (duration < 5) {
+      console.log('[Twilio recording-status] recording too short to transcribe, skipping job');
+      return res.status(200).send('OK');
+    }
     try {
       const master = await getMasterTwilioSettings();
       const twilioAccountSid = master?.twilio_account_sid || '';
