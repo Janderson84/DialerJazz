@@ -1,5 +1,4 @@
-import { Router, Request } from 'express';
-import type { Response } from 'express-serve-static-core';
+import { Router, Request, Response } from 'express';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
@@ -268,7 +267,7 @@ router.post('/send', requireAuth, async (req: AuthenticatedRequest, res, next) =
         Authorization: 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'),
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({ From: fromNumber, To: toE164, Body: rendered }).toString(),
+      body: new URLSearchParams({ From: fromNumber, To: toE164, Body: rendered, StatusCallback: `${process.env.PUBLIC_BASE_URL || 'https://3a50c7f3047f--3001.jackhamr.app'}/api/sms/status` }).toString(),
     });
     const twJson = await twJson_await(twRes);
     if (!twRes.ok) {
@@ -415,7 +414,7 @@ async function sendDueScheduled(): Promise<void> {
             Authorization: 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'),
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-          body: new URLSearchParams({ From: m.from_number, To: m.to_number, Body: m.body }).toString(),
+          body: new URLSearchParams({ From: m.from_number, To: m.to_number, Body: m.body, StatusCallback: `${process.env.PUBLIC_BASE_URL || 'https://3a50c7f3047f--3001.jackhamr.app'}/api/sms/status` }).toString(),
         });
         const twJson = await twRes.json().catch(() => null);
         const patch = await fetch(`${admin.base}/api/database/records/sms_messages?id=eq.${m.id}`, {
@@ -549,7 +548,7 @@ export async function fireAutoReplies(opts: {
           Authorization: 'Basic ' + Buffer.from(`${sid}:${token}`).toString('base64'),
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams({ From: opts.repNumber, To: opts.fromNumber, Body: rendered }).toString(),
+        body: new URLSearchParams({ From: opts.repNumber, To: opts.fromNumber, Body: rendered, StatusCallback: `${process.env.PUBLIC_BASE_URL || 'https://3a50c7f3047f--3001.jackhamr.app'}/api/sms/status` }).toString(),
       });
       const twJson = await twRes.json().catch(() => null);
       if (twRes.ok) {
@@ -639,6 +638,28 @@ router.post('/inbound', (req: Request, res: Response) => {
       res.status(200).type('text/xml').send('<Response/>'); // Twilio retries on 5xx; don't loop
     }
   })();
+});
+
+// ── POST /api/sms/status — Twilio delivery status callback ─────────
+router.post('/status', async (req: Request, res: Response) => {
+  try {
+    const sid = req.body.MessageSid || '';
+    const st = req.body.MessageStatus || '';
+    if (sid && st) {
+      const admin = await adminFetch();
+      const map: Record<string, string> = { queued: 'queued', sent: 'sent', delivered: 'delivered', undelivered: 'failed', failed: 'failed' };
+      const patch: Record<string, unknown> = { status: map[st] || st };
+      if (map[st] === 'failed') patch.error_message = req.body.ErrorMessage || 'Undelivered';
+      await fetch(`${admin.base}/api/database/records/sms_messages?twilio_sid=eq.${encodeURIComponent(sid)}`, {
+        method: 'PATCH',
+        headers: { ...admin.headers(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      }).catch(() => {});
+    }
+    res.status(200).send('OK');
+  } catch {
+    res.status(200).send('OK');
+  }
 });
 
 export default router;
