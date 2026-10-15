@@ -253,7 +253,15 @@ router.post('/dial-status', express.urlencoded({ extended: false }), async (req:
             { headers: admin.headers() }
           ).then(r => r.json()).catch(() => null);
           const row = (Array.isArray(match) ? match : match?.data || [])[0];
-          const idFilter = row?.id ? `id=eq.${row.id}` : `user_id=eq.${repId}&direction=eq.outbound&order=created_at.desc&limit=1`;
+          // No number-matched row: the client may not have logged the call yet
+          // (race). Do NOT blind-patch the rep's newest row — that stamped a
+          // foreign sid on an unrelated call. recording-status resolves the
+          // parent from Twilio anyway, so missing this patch is safe.
+          if (!row) {
+            res.status(200).send('OK');
+            return;
+          }
+          const idFilter = `id=eq.${row.id}`;
           // Store the PARENT call sid — the client reports the dial-leg (child)
           // sid, but recordings/transcripts callback with the parent. Resolve
           // via Twilio (best effort); fall back to the child sid.
