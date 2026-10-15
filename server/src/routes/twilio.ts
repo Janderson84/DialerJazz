@@ -383,8 +383,12 @@ router.post('/recording-status', express.urlencoded({ extended: false }), async 
         const serviceSid = process.env.TWILIO_INTELLIGENCE_SID || '';
         const body: Record<string, string> = {
           SourceSid: (req.body.RecordingSid || ''),
+          // Twilio requires a Channel object naming the source recording —
+          // without it every transcript job 400s (missing Channel).
+          Channel: JSON.stringify({ media_properties: { source_sid: req.body.RecordingSid || '' } }),
         };
         if (serviceSid) body.ServiceSid = serviceSid;
+        else body.ServiceSid = process.env.TWILIO_INTELLIGENCE_SID || '';
         const tr = await fetch(`https://intelligence.twilio.com/v2/Transcripts`, {
           method: 'POST',
           headers: {
