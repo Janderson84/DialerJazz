@@ -281,6 +281,17 @@ export interface CallStats {
   dispositionCounts: Record<string, number>;
 }
 
+export const callsStatsApi = {
+  get: (params: { campaign_id?: string; rep?: string; from?: string; to?: string }) => {
+    const q = new URLSearchParams();
+    if (params.campaign_id) q.set('campaign_id', params.campaign_id);
+    if (params.rep) q.set('rep', params.rep);
+    if (params.from) q.set('from', params.from);
+    if (params.to) q.set('to', params.to);
+    return apiFetch<{ data: { total_calls: number; connected: number; connect_rate: number; dispositions: Record<string, number> } }>(`/calls/outcomes?${q.toString()}`);
+  },
+};
+
 export const callsApi = {
   log: (payload: { lead_id: string | null; campaign_id: string | null; duration_seconds: number; status: string; disposition: string; notes?: string; provider?: string; direction?: 'outbound' | 'inbound'; to_number?: string | null; from_number?: string | null; call_sid?: string | null }) =>
     apiFetch<{ data: unknown; pipedrive?: unknown }>('/calls/log', {

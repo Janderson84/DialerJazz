@@ -1,3 +1,5 @@
+import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
+import { adminFetch } from './sms.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
@@ -388,5 +390,56 @@ router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res, next) =
     next(err);
   }
 });
+
+
+// ── GET /api/calls/stats — aggregate outcome counts for the filters ──
+// Mirrors the list filters (campaign/rep/date). Master sees all; reps see
+// their own rows. Returns totals + per-disposition counts + connect rate.
+router.get('/outcomes', requireAuth, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const isMaster = userId === MASTER_ID();
+    const { campaign_id, rep, from, to } = req.query;
+
+    const admin = await adminFetch();
+    const filters: string[] = ['direction=eq.outbound'];
+    if (campaign_id) filters.push(`campaign_id=eq.${encodeURIComponent(String(campaign_id))}`);
+    if (!isMaster) filters.push(`user_id=eq.${userId}`);
+    else if (rep) filters.push(`user_id=eq.${encodeURIComponent(String(rep))}`);
+    if (from) filters.push(`started_at=gte.${encodeURIComponent(new Date(String(from) + 'T00:00:00').toISOString())}`);
+    if (to) filters.push(`started_at=lte.${encodeURIComponent(new Date(String(to) + 'T23:59:59').toISOString())}`);
+
+    // Aggregate in pages (PostgREST head counts + group-bys aren't exposed
+    // through this client; 500/page over completed calls only).
+    const counts: Record<string, number> = {};
+    let total = 0;
+    let connected = 0;
+    for (let offset = 0; offset < 10000; offset += 500) {
+      const url = `${admin.base}/api/database/records/call_logs?${filters.join('&')}&select=disposition&order=started_at.desc&limit=500&offset=${offset}`;
+      const r = await fetch(url, { headers: admin.headers() });
+      if (!r.ok) break;
+      const data = await r.json();
+      const rows = (Array.isArray(data) ? data : data?.data || []) as any[];
+      if (!rows.length) break;
+      for (const row of rows) {
+        total += 1;
+        const d = row.disposition || 'none';
+        counts[d] = (counts[d] || 0) + 1;
+        if (d === 'answered' || d === 'follow_up' || d === 'voicemail') connected += 1;
+      }
+      if (rows.length < 500) break;
+    }
+
+    res.json({
+      data: {
+        total_calls: total,
+        connected,
+        connect_rate: total ? Math.round((connected / total) * 1000) / 10 : 0,
+        dispositions: counts,
+      },
+    });
+  } catch (e) { next(e); }
+});
+
 
 export default router;

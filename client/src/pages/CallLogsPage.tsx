@@ -3,7 +3,7 @@ import { PhoneCall, Search, Loader2, Clock, User, Building2, MessageSquare, Play
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/hooks/usePagination';
 import { toast } from 'sonner';
-import { callsApi, campaignsApi, type CallLog, type Campaign } from '@/lib/api';
+import { callsApi, callsStatsApi, campaignsApi, type CallLog, type Campaign } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 const DISPOSITION_COLORS: Record<string, string> = {
@@ -51,6 +51,7 @@ const ITEMS_PER_PAGE = 25;
 
 export default function CallLogsPage() {
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
+  const [stats, setStats] = useState<{ total_calls: number; connected: number; connect_rate: number; dispositions: Record<string, number> } | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -77,7 +78,13 @@ export default function CallLogsPage() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [logsRes, campaignsRes] = await Promise.all([
+      const [statsRes, logsRes, campaignsRes] = await Promise.all([
+        callsStatsApi.get({
+          campaign_id: selectedCampaign || undefined,
+          rep: isMaster ? (selectedRep || undefined) : undefined,
+          from: fromDate || undefined,
+          to: toDate || undefined,
+        }).catch(() => null),
         callsApi.list({
           campaign_id: selectedCampaign || undefined,
           rep: isMaster ? (selectedRep || undefined) : undefined,
@@ -90,6 +97,7 @@ export default function CallLogsPage() {
       ]);
       setCallLogs(logsRes.data);
       setMeta(logsRes.meta);
+      if (statsRes) setStats((statsRes as any).data);
       setMetaState({ total: (logsRes.meta as any)?.total ?? 0 });
       setCampaigns(campaignsRes.data);
     } catch (error: any) {
@@ -197,6 +205,41 @@ export default function CallLogsPage() {
           {(fromDate || toDate || selectedRep || selectedCampaign) && ' (filtered)'}
         </span>
       </div>
+
+      {/* Outcome stats (respect current filters) */}
+      {stats && stats.total_calls > 0 && (
+        <div className="bg-white dark:bg-[#0F0F12] rounded-xl p-5 border border-gray-200 dark:border-[#1F1F23]">
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+            <div>
+              <div className="text-3xl font-bold text-foreground">{stats.total_calls}</div>
+              <div className="text-xs text-muted-foreground">Total calls</div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-emerald-500">{stats.connect_rate}%</div>
+              <div className="text-xs text-muted-foreground">Connect rate</div>
+            </div>
+            {([
+              ['answered', 'Interested', 'text-emerald-500'],
+              ['follow_up', 'Follow-up', 'text-indigo-400'],
+              ['voicemail', 'Voicemail', 'text-purple-400'],
+              ['no_answer', 'No Answer', 'text-red-400'],
+              ['busy', 'Busy', 'text-orange-400'],
+              ['wrong_number', 'Wrong Number', 'text-muted-foreground'],
+              ['not_interested', 'Not Interested', 'text-muted-foreground'],
+              ['dnc', 'DNC', 'text-red-500'],
+            ] as const).map(([key, label, color]) => {
+              const n = stats.dispositions[key] || 0;
+              if (!n) return null;
+              return (
+                <div key={key}>
+                  <div className={`text-2xl font-bold ${color}`}>{n}</div>
+                  <div className="text-xs text-muted-foreground">{label}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       {isLoading ? (
