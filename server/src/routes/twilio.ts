@@ -668,4 +668,63 @@ router.get('/killer-calls/recording/:callSid', async (req: Request, res: Respons
   }
 });
 
+
+// ── Call-sid backfill sweeper ───────────────────────────────────────
+// Rows can end up without a call_sid when a call fails before the client
+// learns its SID (international/failed dials) — the dial-status callback
+// fires before the client logs. Every 3 minutes, match recent sid-less
+// rows against Twilio's call records (number + time, unique consumption)
+// and stamp the parent call sid.
+export function startCallSidSweeper(): void {
+  setInterval(async () => {
+    try {
+      const admin = await adminFetch();
+      const rowsRes = await fetch(
+        `${admin.base}/api/database/records/call_logs?call_sid=is.null&started_at=gte.${encodeURIComponent(new Date(Date.now() - 6 * 3600 * 1000).toISOString())}&select=id,to_number,started_at,user_id&order=started_at.desc&limit=25`,
+        { headers: admin.headers() }
+      );
+      if (!rowsRes.ok) return;
+      const rows = (await rowsRes.json()) || [];
+      const rowsList = (Array.isArray(rows) ? rows : rows?.data || []) as any[];
+      if (!rowsList.length) return;
+
+      const master = await getMasterTwilioSettings();
+      const acct = master?.twilio_account_sid || '';
+      const tok = master?.twilio_auth_token || '';
+      if (!acct || !tok) return;
+      const auth = 'Basic ' + Buffer.from(`${acct}:${tok}`).toString('base64');
+
+      // Load recent Twilio calls once
+      const callsRes = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${acct}/Calls.json?PageSize=100&StartTime%3E=${encodeURIComponent(new Date(Date.now() - 7 * 3600 * 1000).toISOString().slice(0, 19) + 'Z')}`, { headers: { Authorization: auth } });
+      if (!callsRes.ok) return;
+      const calls = (await callsRes.json()).calls || [];
+      const children = calls.filter((c: any) => c.parent_call_sid);
+
+      const used = new Set<string>();
+      for (const row of rowsList) {
+        const digits = String(row.to_number || '').replace(/\D/g, '').slice(-10);
+        if (!digits) continue;
+        const rowStart = new Date(row.started_at).getTime();
+        let best: { parent: string; diff: number } | null = null;
+        for (const c of children) {
+          if (used.has(c.parent_call_sid)) continue;
+          const cdigits = String(c.to || '').replace(/\D/g, '').slice(-10);
+          if (cdigits !== digits) continue;
+          const diff = Math.abs(new Date(c.start_time).getTime() - rowStart) / 1000;
+          if (diff <= 120 && (!best || diff < best.diff)) best = { parent: c.parent_call_sid, diff };
+        }
+        if (best) {
+          used.add(best.parent);
+          await fetch(`${admin.base}/api/database/records/call_logs?id=eq.${row.id}`, {
+            method: 'PATCH',
+            headers: { ...admin.headers(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ call_sid: best.parent }),
+          }).catch(() => {});
+          console.log(`[call-sid sweeper] stamped ${best.parent.slice(0, 14)} on row ${row.id}`);
+        }
+      }
+    } catch { /* non-fatal */ }
+  }, 3 * 60 * 1000);
+}
+
 export default router;
