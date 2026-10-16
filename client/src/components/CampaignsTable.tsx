@@ -29,6 +29,7 @@ interface CampaignsTableProps {
 
 const allColumns = [
   "Campaign",
+  "Owner",
   "Progress",
   "Created At",
   "Status",
@@ -113,6 +114,7 @@ export default function CampaignsTable({ campaigns }: CampaignsTableProps) {
         <TableHeader>
           <TableRow className="border-black/5 dark:border-white/5 hover:bg-transparent">
             {visibleColumns.includes("Campaign") && <TableHead className="w-[200px]">Campaign</TableHead>}
+            {visibleColumns.includes("Owner") && <TableHead className="w-[100px] hidden md:table-cell">Owner</TableHead>}
             {visibleColumns.includes("Progress") && <TableHead className="w-[120px]">Progress</TableHead>}
             {visibleColumns.includes("Created At") && <TableHead className="w-[120px] hidden md:table-cell">Created At</TableHead>}
             {visibleColumns.includes("Status") && <TableHead className="w-[100px] hidden sm:table-cell">Status</TableHead>}
@@ -131,6 +133,11 @@ export default function CampaignsTable({ campaigns }: CampaignsTableProps) {
                   {visibleColumns.includes("Campaign") && (
                     <TableCell className="font-semibold whitespace-nowrap">
                       {campaign.name}
+                    </TableCell>
+                  )}
+                  {visibleColumns.includes("Owner") && (
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground hidden md:table-cell">
+                      {campaign.owner_name || '—'}
                     </TableCell>
                   )}
                   {visibleColumns.includes("Progress") && (

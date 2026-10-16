@@ -112,6 +112,7 @@ export interface Campaign {
   id: string;
   user_id: string;
   name: string;
+  owner_name?: string | null;
   dialer_mode: string;
   provider: 'telnyx' | 'twilio' | 'local';
   caller_number?: string;

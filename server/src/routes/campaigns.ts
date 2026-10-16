@@ -1,3 +1,4 @@
+import { MASTER_ID } from '../lib/masterSettings.js';
 import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
@@ -18,17 +19,47 @@ router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunct
     const page = Math.max(1, Number(req.query.page) || 1);
     const perPage = Math.min(100, Math.max(1, Number(req.query.per_page) || 50));
     const offset = (page - 1) * perPage;
+    const isMaster = req.user.id === MASTER_ID();
 
-    const { data, count, error } = await req.db!
+    let query = req.db!
       .database.from('campaigns')
-      .select('*', { count: 'exact' })
-      .eq('user_id', req.user.id)
+      .select('*', { count: 'exact' });
+    // Master sees every user's campaigns; reps see their own.
+    if (!isMaster) query = query.eq('user_id', req.user.id);
+    const { data, count, error } = await query
       .order('created_at', { ascending: false })
       .range(offset, offset + perPage - 1);
 
     if (error) throw new ApiError(500, error.message, 'db_error');
 
-    const total = count || 0;
+    let total = count || 0;
+
+    // Annotate owner display names (useful for master's cross-user view).
+    try {
+      const adminBase = process.env.INFORGE_URL || process.env.INSFORGE_URL || 'http://localhost:7130';
+      const adminUser = process.env.INSFORGE_ADMIN_USER || 'admin';
+      const adminPassword = process.env.INSFORGE_ADMIN_PASSWORD;
+      if (adminPassword) {
+        const s2 = await fetch(`${adminBase}/api/auth/admin/sessions`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: adminUser, password: adminPassword }),
+        });
+        if (s2.ok) {
+          const { accessToken } = await s2.json();
+          const H = { Authorization: `Bearer ${accessToken}`, apikey: accessToken };
+          const members = await fetch(`${adminBase}/api/database/records/team_members?select=rep_user_id,display_name`, { headers: H }).then(r => r.json()).catch(() => null);
+          const nameByUser = new Map<string, string>();
+          for (const m of (Array.isArray(members) ? members : members?.data || []) as any[]) {
+            if (m?.rep_user_id && m?.display_name) nameByUser.set(String(m.rep_user_id), String(m.display_name));
+          }
+          nameByUser.set(MASTER_ID(), nameByUser.get(MASTER_ID()) || 'James');
+          const rows = data || [];
+          for (const r of rows) {
+            (r as any).owner_name = nameByUser.get(String((r as any).user_id)) || null;
+          }
+        }
+      }
+    } catch { /* annotation optional */ }
 
     res.json({
       data: data || [],
