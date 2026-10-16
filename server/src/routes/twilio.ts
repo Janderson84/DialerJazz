@@ -616,7 +616,9 @@ router.get('/killer-calls/feed', async (req: Request, res: Response) => {
     res.json({
       data: out,
       cursor: {
-        since_next: out.length ? out[out.length - 1].started_at : sinceIso,
+        // Normalize to strict ISO-8601 UTC — Postgres timestamps arrive as
+        // '...+00:00' with irregular precision, which trips strict parsers.
+        since_next: out.length ? new Date(out[out.length - 1].started_at).toISOString() : sinceIso,
         overlap_seconds: 60,
         server_now: new Date().toISOString(),
       },
