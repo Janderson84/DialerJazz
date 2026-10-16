@@ -325,19 +325,13 @@ export default function CampaignDialerPage() {
       };
 
       const lead = currentLead;
-      // Texting after a NO-ANSWER/voicemail/busy/wrong-number makes no sense —
-      // and getting stuck on the SMS sheet here stalls the whole session
-      // (reps read it as "dialer not progressing"). Only offer the post-call
-      // text when the person actually picked up.
-      const smsWorthy = ['answered', 'follow_up'].includes(dispValue);
-      if (smsWorthy) {
-        const leadName = `${lead.first_name} ${lead.last_name || ''}`.trim() || lead.phone;
-        setPendingSmsLead({ id: lead.id, name: leadName, phone: lead.phone });
-        smsThenAdvanceRef.current = advance;
-        setShowSmsAfterCall(true);
-      } else {
-        advance();
-      }
+      // Offer the post-call text after EVERY disposition (James's call).
+      // The 'Not now' button keeps no-answer flows moving; the sheet just
+      // gives reps the option when they want it.
+      const leadName = `${lead.first_name} ${lead.last_name || ''}`.trim() || lead.phone;
+      setPendingSmsLead({ id: lead.id, name: leadName, phone: lead.phone });
+      smsThenAdvanceRef.current = advance;
+      setShowSmsAfterCall(true);
 
     } catch (err: unknown) {
       toast.error('Failed to save disposition');
