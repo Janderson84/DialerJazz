@@ -77,12 +77,13 @@ router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunct
 
 router.get('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const { data, error } = await req.db!
+    let query = req.db!
       .database.from('campaigns')
       .select('*')
-      .eq('id', req.params.id)
-      .eq('user_id', req.user.id)
-      .single();
+      .eq('id', req.params.id);
+    // Master can open any user's campaign.
+    if (req.user.id !== MASTER_ID()) query = query.eq('user_id', req.user.id);
+    const { data, error } = await query.single();
 
     if (error) {
       if (error.code === 'PGRST116') throw new ApiError(404, 'Campaign not found', 'not_found');

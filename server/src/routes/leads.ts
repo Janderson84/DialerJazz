@@ -1,3 +1,4 @@
+import { MASTER_ID } from '../lib/masterSettings.js';
 import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
@@ -155,14 +156,16 @@ router.get('/campaign/:campaignId', async (req: AuthenticatedRequest, res: Respo
   try {
     const { limit = '50', offset = '0' } = req.query;
 
-    const { data, count, error } = await req.db!
+    // Master (admin) can view any campaign's leads; reps only their own.
+    let clQuery = req.db!
       .database.from('campaign_leads')
       .select(`
         id,
         leads (*)
       `, { count: 'exact' })
-      .eq('campaign_id', req.params.campaignId)
-      .eq('user_id', req.user.id)
+      .eq('campaign_id', req.params.campaignId);
+    if (req.user.id !== MASTER_ID()) clQuery = clQuery.eq('user_id', req.user.id);
+    const { data, count, error } = await clQuery
       .order('created_at', { ascending: true })
       .range(Number(offset), Number(offset) + Number(limit) - 1);
 
