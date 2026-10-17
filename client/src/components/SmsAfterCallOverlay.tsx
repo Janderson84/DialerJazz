@@ -61,7 +61,7 @@ export default function SmsAfterCallOverlay({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute inset-0 z-30 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
+          className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
         >
           <motion.div
             initial={{ scale: 0.95, y: 8 }}

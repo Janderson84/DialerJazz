@@ -164,12 +164,16 @@ export default function CampaignDialerPage() {
   useEffect(() => {
     const wasCallAttempt = ['trying', 'ringing', 'active'].includes(prevCallState.current);
     if (wasCallAttempt && voice.primaryCallState === 'done') {
-      // Call ended (whether connected or not) -> Show disposition overlay
-      setShowDisposition(true);
-      setShowDTMF(false);
+      // Call ended (whether connected or not) -> Show disposition overlay.
+      // Skip if the post-call SMS sheet is up — that call was already
+      // disposed; re-showing would bury the SMS popup under this sheet.
+      if (!showSmsAfterCall) {
+        setShowDisposition(true);
+        setShowDTMF(false);
+      }
     }
     prevCallState.current = voice.primaryCallState;
-  }, [voice.primaryCallState]);
+  }, [voice.primaryCallState, showSmsAfterCall]);
 
   useEffect(() => {
     if (voice.sipError) toast.error(voice.sipError, { duration: 5000 });
