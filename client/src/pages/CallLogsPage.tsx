@@ -10,6 +10,7 @@ const DISPOSITION_COLORS: Record<string, string> = {
   answered: 'bg-foreground/10 text-foreground border-black/10 dark:border-white/10',
   interested: 'bg-foreground/10 text-foreground border-black/10 dark:border-white/10',
   follow_up: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30',
+  appointment: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   not_interested: 'bg-zinc-500/20 text-muted-foreground border-zinc-500/30',
   no_answer: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
   voicemail: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
@@ -221,6 +222,7 @@ export default function CallLogsPage() {
             {([
               ['answered', 'Interested', 'text-emerald-500'],
               ['follow_up', 'Follow-up', 'text-indigo-400'],
+              ['appointment', 'Appointments', 'text-emerald-400'],
               ['voicemail', 'Voicemail', 'text-purple-400'],
               ['no_answer', 'No Answer', 'text-red-400'],
               ['busy', 'Busy', 'text-orange-400'],

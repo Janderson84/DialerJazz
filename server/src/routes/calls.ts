@@ -427,7 +427,7 @@ router.get('/outcomes', requireAuth, async (req: AuthenticatedRequest, res, next
         counts[d] = (counts[d] || 0) + 1;
         // Human conversations only — voicemail drops are counted separately
         // in the UI, not as "connected".
-        if (d === 'answered' || d === 'follow_up') connected += 1;
+        if (d === 'answered' || d === 'follow_up' || d === 'appointment') connected += 1;
       }
       if (rows.length < 500) break;
     }
