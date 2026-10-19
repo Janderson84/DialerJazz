@@ -512,3 +512,11 @@ export const followupsApi = {
   remove: (id: string) =>
     apiFetch<{ deleted: boolean }>(`/followups/${id}`, { method: 'DELETE' }),
 };
+
+// Apollo/ZoomInfo exports sometimes put numeric record IDs in the company
+// column — those aren't real company names, so treat them as missing.
+export const displayCompany = (company?: string | null): string => {
+  const c = (company || '').trim();
+  if (!c || /^\d+$/.test(c)) return '';
+  return c;
+};

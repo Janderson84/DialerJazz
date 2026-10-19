@@ -31,7 +31,7 @@ import { useLocalCalling } from '@/hooks/useLocalCalling';
 import CallControls from '@/components/CallControls';
 import InCallHUD from '@/components/InCallHUD';
 import DispositionOverlay from '@/components/DispositionOverlay';
-import { followupsApi, type FollowUp } from '@/lib/api';
+import { followupsApi, displayCompany, type FollowUp } from '@/lib/api';
 import SmsAfterCallOverlay from '@/components/SmsAfterCallOverlay';
 
 type DialerMode = 'power' | 'click';
@@ -561,7 +561,7 @@ export default function CampaignDialerPage() {
                     <User className="h-10 w-10 text-foreground" />
                  </div>
                  <h2 className="text-3xl font-extrabold tracking-display text-foreground">{currentLead.first_name} {currentLead.last_name || ''}</h2>
-                 {currentLead.company && <h3 className="text-lg text-muted-foreground font-medium mt-1 tracking-body">{currentLead.company}</h3>}
+                 {displayCompany(currentLead.company) && <h3 className="text-lg text-muted-foreground font-medium mt-1 tracking-body">{displayCompany(currentLead.company)}</h3>}
               </div>
 
               <div 
@@ -668,7 +668,7 @@ export default function CampaignDialerPage() {
                 onRedial={handleRedial}
                 onScheduleCallback={handleScheduleCallback}
                 leadName={currentLead ? [currentLead.first_name, currentLead.last_name].filter(Boolean).join(' ') || '' : ''}
-                leadCompany={currentLead?.company || ''}
+                leadCompany={displayCompany(currentLead?.company)}
                 visible={showDisposition}
                 dispositions={DISPOSITIONS}
                 isDisposing={isDisposing}

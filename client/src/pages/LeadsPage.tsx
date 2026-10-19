@@ -5,6 +5,7 @@ import { NewMessageDialog } from './MessagesPage';
 import { usePagination } from '@/hooks/usePagination';
 import { toast } from 'sonner';
 import { leadsApi, type Lead } from '@/lib/api';
+import { displayCompany } from '@/lib/api';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -225,10 +226,10 @@ export default function LeadsPage() {
                       {/* Name / Company */}
                       <td className="px-4 py-4">
                         <div className="font-medium text-foreground">
-                          {[lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.company || 'Unknown'}
+                          {[lead.first_name, lead.last_name].filter(Boolean).join(' ') || displayCompany(lead.company) || 'Unknown'}
                         </div>
                         <div className="text-xs text-muted-foreground text-opacity-70">
-                          {lead.company && lead.first_name ? lead.company : lead.business_category}
+                          {displayCompany(lead.company) && lead.first_name ? displayCompany(lead.company) : lead.business_category}
                         </div>
                       </td>
 
