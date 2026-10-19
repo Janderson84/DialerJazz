@@ -444,4 +444,79 @@ router.get('/outcomes', requireAuth, async (req: AuthenticatedRequest, res, next
 });
 
 
+
+// ── GET /api/calls/export — CSV of call history (same filters as list) ──
+router.get('/export', async (req: AuthenticatedRequest, res, next) => {
+  // Allow ?token= for browser downloads (window.open can't set headers).
+  if (req.query.token && !req.headers.authorization) {
+    req.headers.authorization = `Bearer ${req.query.token}`;
+  }
+  return requireAuth(req as any, res as any, next as any);
+}, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const userId = req.user!.id;
+    const isMaster = userId === MASTER_ID();
+    const { campaign_id, rep, from, to } = req.query;
+
+    const filters: string[] = [];
+    if (campaign_id) filters.push(`campaign_id=eq.${encodeURIComponent(String(campaign_id))}`);
+    if (!isMaster) filters.push(`user_id=eq.${userId}`);
+    else if (rep) filters.push(`user_id=eq.${encodeURIComponent(String(rep))}`);
+    if (from) filters.push(`started_at=gte.${encodeURIComponent(new Date(String(from) + 'T00:00:00').toISOString())}`);
+    if (to) filters.push(`started_at=lte.${encodeURIComponent(new Date(String(to) + 'T23:59:59').toISOString())}`);
+
+    const admin = await adminFetch();
+    // Rep display names for the CSV
+    const repNames = new Map<string, string>();
+    try {
+      const members = await fetch(`${admin.base}/api/database/records/team_members?select=rep_user_id,display_name`, { headers: admin.headers() }).then(r => r.json());
+      for (const m of (Array.isArray(members) ? members : members?.data || []) as any[]) {
+        if (m?.rep_user_id && m?.display_name) repNames.set(String(m.rep_user_id), String(m.display_name));
+      }
+      repNames.set(MASTER_ID(), repNames.get(MASTER_ID()) || 'James');
+    } catch { /* optional */ }
+
+    const all: any[] = [];
+    for (let offset = 0; offset < 20000; offset += 500) {
+      const url = `${admin.base}/api/database/records/call_logs?${filters.join('&')}&select=*,leads(first_name,last_name,company)&order=started_at.desc&limit=500&offset=${offset}`;
+      const r = await fetch(url, { headers: admin.headers() });
+      if (!r.ok) break;
+      const data = await r.json();
+      const rows = (Array.isArray(data) ? data : data?.data || []) as any[];
+      if (!rows.length) break;
+      all.push(...rows);
+      if (rows.length < 500) break;
+    }
+
+    const esc = (v: unknown) => {
+      const s2 = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s2) ? `"${s2.replace(/"/g, '""')}"` : s2;
+    };
+    const header = ['date', 'rep', 'lead_name', 'company', 'from', 'to', 'direction', 'duration_seconds', 'disposition', 'notes', 'recording'];
+    const lines = [header.join(',')];
+    for (const r of all) {
+      const lead = Array.isArray(r.leads) ? r.leads[0] : r.leads;
+      const leadName = lead ? [lead.first_name, lead.last_name].filter(Boolean).join(' ') : '';
+      lines.push([
+        esc(r.started_at),
+        esc(repNames.get(String(r.user_id)) || ''),
+        esc(leadName),
+        esc(lead?.company || ''),
+        esc(r.from_number),
+        esc(r.to_number),
+        esc(r.direction),
+        esc(r.duration_seconds),
+        esc(r.disposition),
+        esc(r.notes),
+        esc(r.recording_url),
+      ].join(','));
+    }
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="call-history-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(lines.join('\n'));
+  } catch (e) { next(e); }
+});
+
+
 export default router;

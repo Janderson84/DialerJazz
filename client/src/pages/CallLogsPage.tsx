@@ -209,6 +209,24 @@ export default function CallLogsPage() {
         </div>
       </div>
 
+      {/* Export CSV (respects current filters) */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => {
+            const q = new URLSearchParams();
+            if (selectedCampaign) q.set('campaign_id', selectedCampaign);
+            if (isMaster && selectedRep) q.set('rep', selectedRep);
+            if (fromDate) q.set('from', fromDate);
+            if (toDate) q.set('to', toDate);
+            const token = localStorage.getItem('jazz_access_token') || '';
+            window.open(`/api/calls/export?${q.toString()}&token=${encodeURIComponent(token)}`, '_blank');
+          }}
+          className="text-xs font-semibold text-muted-foreground hover:text-foreground underline transition-colors"
+        >
+          Export CSV
+        </button>
+      </div>
+
       {/* Result count for the selected view */}
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <PhoneCall className="h-3.5 w-3.5" />
