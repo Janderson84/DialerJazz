@@ -97,9 +97,33 @@ router.post('/bulk', async (req: AuthenticatedRequest, res: Response, next: Next
   try {
     const body = bulkLeadsSchema.parse(req.body);
 
+    // Validate rows individually: skip bad rows instead of failing the whole
+    // batch (a single malformed phone in a 500-row CSV used to kill it all).
+    const validLeads: z.infer<typeof leadSchema>[] = [];
+    const skipped: { index: number; reason: string }[] = [];
+    const seenPhones = new Set<string>();
+    body.leads.forEach((lead, index) => {
+      const parsed = leadSchema.safeParse(lead);
+      if (!parsed.success) {
+        skipped.push({ index, reason: parsed.error.issues[0]?.message || 'invalid row' });
+        return;
+      }
+      const phone = String(parsed.data.phone || '').trim();
+      if (!phone) {
+        skipped.push({ index, reason: 'missing phone' });
+        return;
+      }
+      if (seenPhones.has(phone)) {
+        skipped.push({ index, reason: `duplicate phone in file` });
+        return;
+      }
+      seenPhones.add(phone);
+      validLeads.push({ ...parsed.data, phone });
+    });
+
     // Deduplicate leads by phone before interacting with DB
     const uniqueLeads = new Map();
-    for (const l of body.leads) {
+    for (const l of validLeads) {
       uniqueLeads.set(l.phone, l);
     }
 
@@ -107,6 +131,10 @@ router.post('/bulk', async (req: AuthenticatedRequest, res: Response, next: Next
       ...lead,
       user_id: req.user.id
     }));
+
+    if (!leadsToUpsert.length) {
+      throw new ApiError(400, `No valid rows to import. ${skipped.length} row(s) skipped: ${skipped.slice(0, 3).map(x => `#${x.index + 1} ${x.reason}`).join('; ')}`, 'no_valid_rows');
+    }
 
     // Step 1: Upsert all leads based on User ID & Phone (prevents duplicate contacts globally)
     const { data: upsertedLeads, error: upsertError } = await req.db!
@@ -145,7 +173,12 @@ router.post('/bulk', async (req: AuthenticatedRequest, res: Response, next: Next
         .eq('id', body.campaign_id);
     }
 
-    res.status(201).json({ data: upsertedLeads, count: upsertedLeads.length });
+    res.status(201).json({
+      data: upsertedLeads,
+      count: upsertedLeads.length,
+      skipped_rows: skipped,
+      skipped_count: skipped.length,
+    });
   } catch (error) {
     next(error);
   }

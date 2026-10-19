@@ -391,10 +391,17 @@ export default function CreateCampaignModal({ isOpen, onClose, onCreated }: Prop
           setUploadProgress(80);
 
           // 2. Submit to Bulk API
-          await leadsApi.bulkUpload(newCampaignId, parsedLeads);
+          const bulkRes = await leadsApi.bulkUpload(newCampaignId, parsedLeads) as any;
           
           setUploadProgress(100);
-          toast.success(`Campaign created with ${parsedLeads.length} leads!`);
+          const imported = bulkRes?.count ?? parsedLeads.length;
+          const skippedCount = bulkRes?.skipped_count || 0;
+          if (skippedCount > 0) {
+            const first = (bulkRes?.skipped_rows || []).slice(0, 2).map((x: any) => `row ${x.index + 1}: ${x.reason}`).join('; ');
+            toast.warning(`Imported ${imported} leads — skipped ${skippedCount} invalid row(s) (${first}${skippedCount > 2 ? '…' : ''})`, { duration: 8000 });
+          } else {
+            toast.success(`Campaign created with ${imported} leads!`);
+          }
           setStep('success');
           onCreated();
 
