@@ -296,7 +296,12 @@ export default function Dashboard() {
             {teamPulse.length === 0 ? (
               <p className="text-xs text-zinc-500 dark:text-zinc-400">No outbound calls logged this {pulseRange === 'today' ? 'day' : pulseRange}.</p>
             ) : teamPulse.map((r) => (
-              <div key={r.rep_user_id} className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-all duration-200">
+              <div
+                key={r.rep_user_id}
+                onClick={() => navigate(`/call-logs?rep=${r.rep_user_id}`)}
+                title="View this rep's call history"
+                className="flex items-center justify-between p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-all duration-200 cursor-pointer"
+              >
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="h-7 w-7 rounded-full bg-zinc-200 dark:bg-zinc-700 flex items-center justify-center text-[11px] font-semibold text-zinc-700 dark:text-zinc-200 shrink-0">
                     {r.name.slice(0, 2).toUpperCase()}

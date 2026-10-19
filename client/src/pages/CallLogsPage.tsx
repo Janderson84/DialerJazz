@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PhoneCall, Search, Loader2, Clock, User, Building2, MessageSquare, Play } from 'lucide-react';
 import Pagination from '@/components/ui/pagination';
 import { usePagination } from '@/hooks/usePagination';
@@ -57,7 +58,8 @@ export default function CallLogsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState<string>('');
-  const [selectedRep, setSelectedRep] = useState<string>('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedRep, setSelectedRep] = useState<string>(() => searchParams.get('rep') || '');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [roster, setRoster] = useState<{ rep_user_id: string; display_name: string }[]>([]);
@@ -107,6 +109,16 @@ export default function CallLogsPage() {
       setIsLoading(false);
     }
   }, [selectedCampaign, selectedRep, fromDate, toDate, isMaster, currentPage, perPage, setMeta]);
+
+  // Keep ?rep= in the URL in sync with the filter (deep-linkable from Team Pulse)
+  useEffect(() => {
+    const current = searchParams.get('rep') || '';
+    if (selectedRep !== current) {
+      const next = new URLSearchParams(searchParams);
+      if (selectedRep) next.set('rep', selectedRep); else next.delete('rep');
+      setSearchParams(next, { replace: true });
+    }
+  }, [selectedRep, searchParams, setSearchParams]);
 
   useEffect(() => {
     fetchData();
