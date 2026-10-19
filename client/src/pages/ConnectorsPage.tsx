@@ -572,6 +572,7 @@ export default function ConnectorsPage() {
 
               <div className="max-h-[65vh] overflow-y-auto pr-2 space-y-8">
                 {/* 1. Account SID + Auth Token */}
+                {isMaster ? (
                 <form onSubmit={handleVerifyTwilio} className="space-y-4">
                   <div>
                     <h4 className="text-sm font-semibold text-foreground tracking-display mb-1">Account Credentials</h4>
@@ -618,11 +619,17 @@ export default function ConnectorsPage() {
                       {isVerifyingTwilio ? 'Verifying...' : (hasTwilioKey ? 'Update Credentials' : 'Verify & Connect')}
                     </button>
                   </div>
-                </form>
+</form>
+                ) : (
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                    Texting and calling are managed centrally by the account owner — no credentials needed on your side. If something isn't working, ask James.
+                  </div>
+                )}
 
                 <hr className="border-border" />
 
                 {/* 2. API Key + Secret + TwiML App */}
+                {isMaster ? (
                 <form onSubmit={handleSaveTwilioCreds} className="space-y-4">
                   <div>
                     <h4 className="text-sm font-semibold text-foreground tracking-display mb-1">WebRTC Configuration</h4>
@@ -712,6 +719,11 @@ export default function ConnectorsPage() {
                     </button>
                   </div>
                 </form>
+                ) : (
+                  <div className="rounded-xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                    Browser calling is managed centrally by the account owner — no credentials needed on your side. If something isn't working, ask James.
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -2,7 +2,7 @@ import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
-import { getMasterTwilioSettings } from '../lib/masterSettings.js';
+import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -65,6 +65,17 @@ router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunct
 router.put('/', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const body = updateSettingsSchema.parse(req.body);
+
+    // Reps dial through the master's shared telephony account — they must not
+    // write credentials (a partial/invalid save silently breaks their dialer
+    // by defeating the master-credential fallback).
+    if (req.user.id !== MASTER_ID()) {
+      const forbidden = ['twilio_account_sid', 'twilio_auth_token', 'twilio_api_key', 'twilio_api_secret', 'twilio_twiml_app_sid', 'twilio_caller_number', 'telnyx_api_key', 'telnyx_sip_login', 'telnyx_sip_password', 'telnyx_caller_number'] as const;
+      const attempted = forbidden.filter((k) => (body as Record<string, unknown>)[k] !== undefined);
+      if (attempted.length) {
+        throw new ApiError(403, 'Only the account owner can change telephony credentials', 'forbidden_field');
+      }
+    }
 
     const updatePayload: Record<string, unknown> = {
       user_id: req.user.id,
