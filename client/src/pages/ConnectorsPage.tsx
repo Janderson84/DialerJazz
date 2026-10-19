@@ -13,6 +13,13 @@ export default function ConnectorsPage() {
 
   // ── Pipedrive ──
   const isMaster = user?.id === MASTER_USER_ID_CLIENT;
+
+  useEffect(() => {
+    if (!isMaster) return;
+    apiFetch<any>('/diag/webhooks')
+      .then(d => setWebhookHealth(d?.data || []))
+      .catch(() => setWebhookHealth([]));
+  }, [isMaster]);
   const [pdToken, setPdToken] = useState('');
   const [pdConnecting, setPdConnecting] = useState(false);
   const [pdStatus, setPdStatus] = useState<{ connected: boolean }>({ connected: false });
@@ -64,6 +71,7 @@ export default function ConnectorsPage() {
   const [isLoadingTelnyxData, setIsLoadingTelnyxData] = useState(false);
 
   const [twilioBalance, setTwilioBalance] = useState<{ balance: string; currency: string } | null>(null);
+  const [webhookHealth, setWebhookHealth] = useState<any[] | null>(null);
   const [twilioNumbers, setTwilioNumbers] = useState<{ phone_number: string; friendly_name: string }[]>([]);
   const [isLoadingTwilioData, setIsLoadingTwilioData] = useState(false);
 
@@ -337,6 +345,27 @@ export default function ConnectorsPage() {
           <p className="text-sm text-muted-foreground mb-4">
             Import open deals as dialer leads and log every call back to the deal automatically.
           </p>
+          {isMaster && webhookHealth && webhookHealth.length > 0 && (
+            <div className="rounded-2xl border border-border bg-surface p-5 space-y-3">
+              <h4 className="text-sm font-semibold text-foreground tracking-display">Phone line health</h4>
+              <div className="space-y-2">
+                {webhookHealth.map((n) => (
+                  <div key={n.number} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    <span className="font-mono font-semibold text-foreground w-32">{n.number}</span>
+                    <span className={n.voice_wired ? 'text-emerald-500' : 'text-red-500'}>
+                      {n.voice_wired ? '✓ calls wired' : '✗ calls not wired'}
+                    </span>
+                    <span className={n.sms_wired ? 'text-emerald-500' : 'text-red-500'}>
+                      {n.sms_wired ? '✓ texts wired' : '✗ texts not wired'}
+                    </span>
+                    <span className="text-muted-foreground ml-auto">
+                      last call: {n.last_call ? new Date(n.last_call).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'never'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {isMaster && (
             <div className="flex gap-2 mb-3">
               <input
