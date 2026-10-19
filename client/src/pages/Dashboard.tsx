@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import CampaignsTable from '@/components/CampaignsTable';
 import { campaignsApi, settingsApi, statsApi, followupsApi, type Campaign, type FollowUp } from '@/lib/api';
 
-type TeamPulseRow = { rep_user_id: string; name: string; is_master: boolean; calls: number; connected: number; talk_secs: number };
+type TeamPulseRow = { rep_user_id: string; name: string; is_master: boolean; calls: number; connected: number; talk_secs: number; overdue_callbacks?: number };
 
 import CreateCampaignModal from '@/components/CreateCampaignModal';
 
@@ -304,6 +304,9 @@ export default function Dashboard() {
                   <div className="min-w-0">
                     <h3 className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate">{r.name}{r.is_master ? ' (you)' : ''}</h3>
                     <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{r.talk_secs >= 60 ? `${Math.floor(r.talk_secs / 60)}m ${r.talk_secs % 60}s` : `${r.talk_secs}s`} talk time</p>
+                    {(r.overdue_callbacks || 0) > 0 && (
+                      <p className="text-[11px] text-amber-500 font-semibold">⏰ {r.overdue_callbacks} callback{(r.overdue_callbacks || 0) > 1 ? 's' : ''} overdue</p>
+                    )}
                   </div>
                 </div>
                 <div className="text-right shrink-0">

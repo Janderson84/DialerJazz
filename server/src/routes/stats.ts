@@ -62,6 +62,18 @@ router.get('/team-pulse', async (req: AuthenticatedRequest, res: Response, next:
     ).then(r => r.json());
     const team = (Array.isArray(members) ? members : members?.data || []) as any[];
 
+    // Overdue callbacks per rep (open follow_ups past due) — coaching signal.
+    const overdueByRep = new Map<string, number>();
+    try {
+      const fu = await fetch(
+        `${adminBase}/api/database/records/follow_ups?status=eq.open&due_at=lte.${encodeURIComponent(new Date().toISOString())}&select=user_id`,
+        { headers: H }
+      ).then(r => r.json());
+      for (const f of (Array.isArray(fu) ? fu : fu?.data || []) as any[]) {
+        if (f?.user_id) overdueByRep.set(String(f.user_id), (overdueByRep.get(String(f.user_id)) || 0) + 1);
+      }
+    } catch { /* optional field */ }
+
     // Day boundary in America/Vancouver (DST-aware via Intl)
     const tz = 'America/Vancouver';
     const nowParts = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
@@ -109,6 +121,7 @@ router.get('/team-pulse', async (req: AuthenticatedRequest, res: Response, next:
         calls: e?.calls || 0,
         connected: e?.connected || 0,
         talk_secs: e?.secs || 0,
+        overdue_callbacks: overdueByRep.get(String(m.rep_user_id)) || 0,
       });
     }
     // Master's own calls (not on the roster)
@@ -118,6 +131,7 @@ router.get('/team-pulse', async (req: AuthenticatedRequest, res: Response, next:
       name: req.user.name || 'You',
       is_master: true,
       calls: masterEntry?.calls || 0,
+      overdue_callbacks: overdueByRep.get(String(req.user.id)) || 0,
       connected: masterEntry?.connected || 0,
       talk_secs: masterEntry?.secs || 0,
     });
