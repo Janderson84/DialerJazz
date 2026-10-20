@@ -4,7 +4,7 @@ import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
 
 const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || 'https://3a50c7f3047f--3001.jackhamr.app';
 
-async function main() {
+export async function ensureWebhooksWired(): Promise<void> {
   const settings = await getMasterTwilioSettings();
   if (!settings?.twilio_account_sid || !settings?.twilio_auth_token) {
     console.error('Master Twilio creds not configured');
@@ -54,4 +54,3 @@ async function main() {
   }
 }
 
-main().catch(e => { console.error(e); process.exit(1); });

@@ -16,6 +16,7 @@ import statsRouter from './routes/stats.js';
 import callsRouter from './routes/calls.js';
 import telnyxRouter from './routes/telnyx.js';
 import twilioRouter, { startTranscriptPoller, startCallSidSweeper } from './routes/twilio.js';
+import { ensureWebhooksWired } from './scripts/update-twilio-webhooks.js';
 import followupsRouter from './routes/followups.js';
 import teamRouter from './routes/team.js';
 import voicemailRouter from './routes/voicemail.js';
@@ -143,6 +144,13 @@ if (process.env.NODE_ENV !== 'test') {
   startScheduledSweep(); // fires due scheduled SMS every minute
   startTranscriptPoller(); // attaches completed call transcriptions
   startCallSidSweeper(); // stamps missing call_sids from Twilio records
+
+  // Webhook drift guard: verify all lines' webhooks on boot and nightly;
+  // auto-rewire if any drifted (caught Joe's line pointing at an old app).
+  void ensureWebhooksWired().catch((e) => console.error('[webhook-guard] boot check failed:', e?.message || e));
+  setInterval(() => {
+    void ensureWebhooksWired().catch((e) => console.error('[webhook-guard] nightly check failed:', e?.message || e));
+  }, 24 * 60 * 60 * 1000);
   httpServer.listen(PORT, () => {
     console.log(`🚀 SalesCloser Cold Call Machine API running on http://localhost:${PORT}`);
   });
