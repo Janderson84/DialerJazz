@@ -93,6 +93,7 @@ export default function CallLogsPage() {
           rep: isMaster ? (selectedRep || undefined) : undefined,
           from: fromDate || undefined,
           to: toDate || undefined,
+          q: searchTerm || undefined,
           page: currentPage,
           per_page: perPage,
         }),
@@ -108,7 +109,7 @@ export default function CallLogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCampaign, selectedRep, fromDate, toDate, isMaster, currentPage, perPage, setMeta]);
+  }, [selectedCampaign, selectedRep, fromDate, toDate, searchTerm, isMaster, currentPage, perPage, setMeta]);
 
   // Keep ?rep= in the URL in sync with the filter (deep-linkable from Team Pulse)
   useEffect(() => {
@@ -154,7 +155,7 @@ export default function CallLogsPage() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground text-opacity-70" />
           <input
-            placeholder="Search by name, phone, or company..."
+            placeholder="Search calls, names, transcripts…"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-[0.85rem] bg-surface border border-black/5 dark:border-white/5 text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/30 transition-all shadow-sm"

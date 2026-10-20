@@ -212,9 +212,25 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
     const userId = req.user!.id;
     const { campaign_id, lead_id, rep } = req.query;
+    const q = String(req.query.q || '').trim();
     const page = Math.max(1, Number(req.query.page) || 1);
     const perPage = Math.min(100, Math.max(1, Number(req.query.per_page) || 25));
     const offset = (page - 1) * perPage;
+
+    // Transcript search: ?q= filters to calls whose transcript OR notes mention the text
+    if (q) {
+      const adminQ = await adminFetch();
+      const or = `or=(transcription.ilike.*${encodeURIComponent(q)}*,notes.ilike.*${encodeURIComponent(q)}*,to_number.ilike.*${encodeURIComponent(q)}*)`;
+      const found = await fetch(
+        `${adminQ.base}/api/database/records/call_logs?${or}&select=id&order=started_at.desc&limit=500`,
+        { headers: adminQ.headers() }
+      ).then(r => r.json()).catch(() => null);
+      const ids = ((Array.isArray(found) ? found : found?.data || []) as any[]).map(r => r.id);
+      if (!ids.length) {
+        return res.json({ data: [], meta: { total: 0 } });
+      }
+      (req as any)._transcriptIds = ids;
+    }
 
     // Roster (admin fetch): determines whether the caller is the master and
     // gives us rep ids + display names for attribution.
@@ -271,6 +287,7 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res, next) => {
         duration_seconds,
         recording_url,
         notes,
+        transcription,
         started_at,
         ended_at,
         created_at,
@@ -286,6 +303,11 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res, next) => {
     }
     if (lead_id) {
       query = query.eq('lead_id', lead_id as string);
+    }
+    // Transcript search (?q=): restrict to rows whose transcript mentions it
+    const transcriptIds = (req as any)._transcriptIds as string[] | undefined;
+    if (transcriptIds) {
+      query = query.in('id', transcriptIds);
     }
     // Date range (inclusive), compared against the call start timestamp.
     // Dates are interpreted in the team's local timezone (America/Vancouver),
