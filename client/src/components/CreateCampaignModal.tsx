@@ -313,6 +313,8 @@ export default function CreateCampaignModal({ isOpen, onClose, onCreated }: Prop
         try {
           const rawRows = results.data as Record<string, any>[];
           const uniquePhones = new Set<string>();
+          let dupInFile = 0;
+          let noPhone = 0;
           const parsedLeads: Omit<Lead, 'id' | 'campaign_id' | 'created_at'>[] = [];
 
           // Determine if we need to split a single "name" column
@@ -330,7 +332,8 @@ export default function CreateCampaignModal({ isOpen, onClose, onCreated }: Prop
             const cleanPhone = rawPhone.replace(/[^0-9+]/g, '');
             
             // Skip rows without viable phone numbers, and deduplicate
-            if (cleanPhone.length < 7 || uniquePhones.has(cleanPhone)) continue;
+            if (cleanPhone.length < 7) { noPhone += 1; continue; }
+            if (uniquePhones.has(cleanPhone)) { dupInFile += 1; continue; }
             uniquePhones.add(cleanPhone);
 
             let first_name = getField('first_name');
@@ -389,6 +392,11 @@ export default function CreateCampaignModal({ isOpen, onClose, onCreated }: Prop
           const newCampaignId = Array.isArray(data) ? data[0].id : (data as any).id;
 
           setUploadProgress(80);
+
+          // Pre-flight quality report
+          if (noPhone > 0 || dupInFile > 0) {
+            toast.info(`File check: ${noPhone} row(s) without a phone and ${dupInFile} duplicate(s) will be skipped`, { duration: 7000 });
+          }
 
           // 2. Submit to Bulk API
           const bulkRes = await leadsApi.bulkUpload(newCampaignId, parsedLeads) as any;
