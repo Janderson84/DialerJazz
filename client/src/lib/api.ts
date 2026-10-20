@@ -289,7 +289,7 @@ export const callsStatsApi = {
     if (params.rep) q.set('rep', params.rep);
     if (params.from) q.set('from', params.from);
     if (params.to) q.set('to', params.to);
-    return apiFetch<{ data: { total_calls: number; connected: number; connect_rate: number; dispositions: Record<string, number> } }>(`/calls/outcomes?${q.toString()}`);
+    return apiFetch<{ data: { total_calls: number; connected: number; connect_rate: number; dispositions: Record<string, number>; by_campaign?: { campaign_id: string; name: string; calls: number; human: number; rate: number }[] } }>(`/calls/outcomes?${q.toString()}`);
   },
 };
 

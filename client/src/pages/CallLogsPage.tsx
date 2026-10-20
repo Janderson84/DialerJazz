@@ -53,7 +53,7 @@ const ITEMS_PER_PAGE = 25;
 
 export default function CallLogsPage() {
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
-  const [stats, setStats] = useState<{ total_calls: number; connected: number; connect_rate: number; dispositions: Record<string, number> } | null>(null);
+  const [stats, setStats] = useState<{ total_calls: number; connected: number; connect_rate: number; dispositions: Record<string, number>; by_campaign?: { campaign_id: string; name: string; calls: number; human: number; rate: number }[] } | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -270,6 +270,20 @@ export default function CallLogsPage() {
               );
             })}
           </div>
+          {isMaster && (stats.by_campaign?.length || 0) > 1 && !selectedCampaign && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#1F1F23]">
+              <div className="text-xs font-semibold text-muted-foreground mb-2">Connect rate by campaign</div>
+              <div className="space-y-1">
+                {[...(stats.by_campaign || [])].filter(c => c.calls >= 5).sort((a, b) => b.rate - a.rate).slice(0, 6).map((c) => (
+                  <div key={c.campaign_id} className="flex items-center gap-3 text-xs">
+                    <button onClick={() => setSelectedCampaign(c.campaign_id)} className="flex-1 text-left truncate text-foreground hover:underline">{c.name}</button>
+                    <span className="text-muted-foreground w-16 text-right">{c.calls} calls</span>
+                    <span className={`w-14 text-right font-bold ${c.rate >= 3 ? 'text-emerald-500' : c.rate >= 1 ? 'text-amber-500' : 'text-red-400'}`}>{c.rate}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

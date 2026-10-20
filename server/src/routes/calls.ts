@@ -432,12 +432,52 @@ router.get('/outcomes', requireAuth, async (req: AuthenticatedRequest, res, next
       if (rows.length < 500) break;
     }
 
+    // Per-campaign quality (master only view aid): calls + human connects
+    const byCampaign: { campaign_id: string; name: string; calls: number; human: number; rate: number }[] = [];
+    if (isMaster) {
+      const campRes = await fetch(`${admin.base}/api/database/records/campaigns?select=id,name&order=created_at.desc&limit=100`, { headers: admin.headers() });
+      if (campRes.ok) {
+        const camps = (await campRes.json()) || [];
+        const campRows = (Array.isArray(camps) ? camps : camps?.data || []) as any[];
+        const nameById = new Map(campRows.map((c: any) => [String(c.id), String(c.name)]));
+        // Need campaign_id per call: re-query with campaign_id included
+        const countsByCamp = new Map<string, { calls: number; human: number }>();
+        for (let offset = 0; offset < 10000; offset += 500) {
+          const url2 = `${admin.base}/api/database/records/call_logs?${filters.filter(f => !f.startsWith('campaign_id=')).join('&')}&select=campaign_id,disposition&order=started_at.desc&limit=500&offset=${offset}`;
+          const r2 = await fetch(url2, { headers: admin.headers() });
+          if (!r2.ok) break;
+          const d2 = await r2.json();
+          const rows2 = (Array.isArray(d2) ? d2 : d2?.data || []) as any[];
+          if (!rows2.length) break;
+          for (const row of rows2) {
+            if (!row.campaign_id) continue;
+            const e = countsByCamp.get(String(row.campaign_id)) || { calls: 0, human: 0 };
+            e.calls += 1;
+            if (row.disposition === 'answered' || row.disposition === 'follow_up' || row.disposition === 'appointment') e.human += 1;
+            countsByCamp.set(String(row.campaign_id), e);
+          }
+          if (rows2.length < 500) break;
+        }
+        for (const [cid, e] of countsByCamp) {
+          byCampaign.push({
+            campaign_id: cid,
+            name: nameById.get(cid) || 'Unknown campaign',
+            calls: e.calls,
+            human: e.human,
+            rate: e.calls ? Math.round((e.human / e.calls) * 1000) / 10 : 0,
+          });
+        }
+        byCampaign.sort((a, b) => b.calls - a.calls);
+      }
+    }
+
     res.json({
       data: {
         total_calls: total,
         connected,
         connect_rate: total ? Math.round((connected / total) * 1000) / 10 : 0,
         dispositions: counts,
+        by_campaign: byCampaign,
       },
     });
   } catch (e) { next(e); }
