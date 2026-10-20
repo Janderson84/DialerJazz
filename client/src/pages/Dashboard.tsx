@@ -295,7 +295,7 @@ export default function Dashboard() {
           <div className="space-y-2">
             {teamPulse.length === 0 ? (
               <p className="text-xs text-zinc-500 dark:text-zinc-400">No outbound calls logged this {pulseRange === 'today' ? 'day' : pulseRange}.</p>
-            ) : teamPulse.map((r) => (
+            ) : [...teamPulse].sort((a, b) => b.calls - a.calls).map((r) => (
               <div
                 key={r.rep_user_id}
                 onClick={() => navigate(`/call-logs?rep=${r.rep_user_id}`)}
