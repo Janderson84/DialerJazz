@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Phone, Users, Clock, Plus, Wifi, WifiOff, Loader2, FolderOpen, Wallet, CreditCard, CalendarClock, Check, X, PhoneCall } from 'lucide-react';
+import { FileText, Phone, Users, Clock, Plus, Wifi, WifiOff, Loader2, FolderOpen, Wallet, CreditCard, CalendarClock, Check, X, PhoneCall } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import CampaignsTable from '@/components/CampaignsTable';
@@ -163,6 +163,8 @@ export default function Dashboard() {
                   { icon: Phone, label: 'Campaigns Total', value: String(stats.totalCampaigns), type: 'campaigns' as const },
                   { icon: Users, label: 'CRM Leads', value: String(totalLeads), type: 'leads' as const },
                   { icon: Clock, label: 'Active Campaigns', value: String(activeCampaigns), type: 'active' as const },
+                  { icon: FolderOpen, label: 'Paused Campaigns', value: String(campaigns.filter(c => c.status === 'paused').length), type: 'paused' as const },
+                  { icon: FileText, label: 'Draft Campaigns', value: String(campaigns.filter(c => c.status === 'draft').length), type: 'draft' as const },
                   { icon: CreditCard, label: 'Completion Rate', value: totalLeads > 0 ? `${Math.round((totalCalled / totalLeads) * 100)}%` : '0%', type: 'completion' as const },
                 ].map((stat) => (
                   <div
