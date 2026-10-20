@@ -180,12 +180,44 @@ export default function CampaignDialerPage() {
     if (voice.sipError) toast.error(voice.sipError, { duration: 5000 });
   }, [voice.sipError]);
 
+
   const currentLead = leads[currentIndex];
   // Maintain context
   useEffect(() => {
     if (currentLead) setNotes(currentLead.notes || '');
     setIsDetailsExpanded(false); // reset on next lead
   }, [currentLead]);
+
+  // Keyboard shortcuts (power users): D = dial current lead, N = next lead,
+  // P = pause/resume session. Ignored while typing in inputs/textarea.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === 'd') {
+        e.preventDefault();
+        if (!['trying', 'ringing', 'active'].includes(voice.primaryCallState)) handleDialForLead(currentLead);
+      } else if (k === 'n') {
+        e.preventDefault();
+        if (!['trying', 'ringing', 'active'].includes(voice.primaryCallState)) navigateNext();
+      } else if (k === 'p') {
+        e.preventDefault();
+        if (isSessionPausedRef.current) {
+          isSessionPausedRef.current = false;
+          setIsSessionPaused(false);
+          toast.success('Session resumed');
+        } else {
+          isSessionPausedRef.current = true;
+          setIsSessionPaused(true);
+          toast.info('Session paused — press P to resume');
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [voice.primaryCallState, currentLead]);
 
   const handleDialForLead = (lead: Lead | undefined) => {
     if (!lead) return;
