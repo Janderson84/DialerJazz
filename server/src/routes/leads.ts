@@ -1,4 +1,5 @@
 import { MASTER_ID } from '../lib/masterSettings.js';
+import { adminFetch } from './sms.js';
 import { Router, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
@@ -136,6 +137,24 @@ router.post('/bulk', async (req: AuthenticatedRequest, res: Response, next: Next
       throw new ApiError(400, `No valid rows to import. ${skipped.length} row(s) skipped: ${skipped.slice(0, 3).map(x => `#${x.index + 1} ${x.reason}`).join('; ')}`, 'no_valid_rows');
     }
 
+    // Historical-quality check: how many of these numbers already produced
+    // wrong-number or DNC outcomes? Warn so bad lists get caught before reps
+    // burn dial time.
+    let bad_history = 0;
+    try {
+      const phones = leadsToUpsert.map(l => String(l.phone).replace(/\D/g, '').slice(-10)).filter(Boolean);
+      if (phones.length) {
+        const admin = await adminFetch();
+        const badRes = await fetch(
+          `${admin.base}/api/database/records/call_logs?disposition=in.(wrong_number,dnc)&select=to_number&limit=1000`,
+          { headers: admin.headers() }
+        ).then(r => r.json()).catch(() => null);
+        const badSet = new Set(((Array.isArray(badRes) ? badRes : badRes?.data || []) as any[])
+          .map(r => String(r.to_number || '').replace(/\D/g, '').slice(-10)));
+        bad_history = phones.filter(p => badSet.has(p)).length;
+      }
+    } catch { /* optional check */ }
+
     // Step 1: Upsert all leads based on User ID & Phone (prevents duplicate contacts globally)
     const { data: upsertedLeads, error: upsertError } = await req.db!
       .database.from('leads')
@@ -178,6 +197,7 @@ router.post('/bulk', async (req: AuthenticatedRequest, res: Response, next: Next
       count: upsertedLeads.length,
       skipped_rows: skipped,
       skipped_count: skipped.length,
+      bad_history,
     });
   } catch (error) {
     next(error);

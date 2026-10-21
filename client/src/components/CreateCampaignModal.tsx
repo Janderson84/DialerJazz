@@ -404,10 +404,14 @@ export default function CreateCampaignModal({ isOpen, onClose, onCreated }: Prop
           setUploadProgress(100);
           const imported = bulkRes?.count ?? parsedLeads.length;
           const skippedCount = bulkRes?.skipped_count || 0;
+          const badHistory = bulkRes?.bad_history || 0;
+          if (badHistory >= 5) {
+            toast.warning(`⚠️ ${badHistory} of these numbers previously produced wrong-number or DNC outcomes — consider a fresh list`, { duration: 10000 });
+          }
           if (skippedCount > 0) {
             const first = (bulkRes?.skipped_rows || []).slice(0, 2).map((x: any) => `row ${x.index + 1}: ${x.reason}`).join('; ');
             toast.warning(`Imported ${imported} leads — skipped ${skippedCount} invalid row(s) (${first}${skippedCount > 2 ? '…' : ''})`, { duration: 8000 });
-          } else {
+          } else if (badHistory < 5) {
             toast.success(`Campaign created with ${imported} leads!`);
           }
           setStep('success');
