@@ -374,6 +374,9 @@ router.get('/stats', requireAuth, async (req: AuthenticatedRequest, res, next) =
   try {
     const userId = req.user!.id;
     const { campaign_id } = req.query;
+    if (campaign_id && !/^[0-9a-f-]{36}$/i.test(String(campaign_id))) {
+      return res.json({ data: { totalCalls: 0, answeredCalls: 0, totalDuration: 0, avgDuration: 0, dispositionCounts: {} } });
+    }
 
     let baseQuery = req.db!.database
       .from('call_logs')
