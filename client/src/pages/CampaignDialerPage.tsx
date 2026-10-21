@@ -72,6 +72,7 @@ export default function CampaignDialerPage() {
   const sessionOutcomesRef = useRef<{ total: number; human: number; voicemail: number; no_answer: number }>({ total: 0, human: 0, voicemail: 0, no_answer: 0 });
   const recentlyDialedRef = useRef<Set<string>>(new Set());
   const [showSessionRecap, setShowSessionRecap] = useState(false);
+  const [leadHistory, setLeadHistory] = useState<{ disposition: string | null; started_at: string; notes: string | null }[]>([]);
   const [pendingSmsLead, setPendingSmsLead] = useState<{ id: string; name: string; phone: string } | null>(null);
   const smsThenAdvanceRef = useRef<(() => void) | null>(null);
   const [showDTMF, setShowDTMF] = useState(false);
@@ -205,6 +206,12 @@ export default function CampaignDialerPage() {
   useEffect(() => {
     if (currentLead) setNotes(currentLead.notes || '');
     setIsDetailsExpanded(false); // reset on next lead
+    setLeadHistory([]);
+    if (currentLead?.id) {
+      callsApi.list({ lead_id: currentLead.id, per_page: 5 })
+        .then((r: any) => setLeadHistory((r?.data || []).filter((c: any) => c.disposition && c.disposition !== 'redial')))
+        .catch(() => {});
+    }
   }, [currentLead]);
 
   // Keyboard shortcuts (power users): D = dial current lead, N = next lead,
@@ -629,6 +636,15 @@ export default function CampaignDialerPage() {
                  </div>
                  <h2 className="text-3xl font-extrabold tracking-display text-foreground">{currentLead.first_name} {currentLead.last_name || ''}</h2>
                  {displayCompany(currentLead.company) && <h3 className="text-lg text-muted-foreground font-medium mt-1 tracking-body">{displayCompany(currentLead.company)}</h3>}
+                 {leadHistory.length > 0 && (
+                   <div className="flex flex-wrap gap-1.5 mt-2">
+                     {leadHistory.slice(0, 4).map((h, i) => (
+                       <span key={i} className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-muted border border-border text-muted-foreground">
+                         {new Date(h.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}: {(h.disposition || '').replace('_', ' ')}
+                       </span>
+                     ))}
+                   </div>
+                 )}
               </div>
 
               <div 
