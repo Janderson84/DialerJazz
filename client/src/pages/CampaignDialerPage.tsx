@@ -69,6 +69,8 @@ export default function CampaignDialerPage() {
   const [showSmsAfterCall, setShowSmsAfterCall] = useState(false);
   const [overdueCallbacks, setOverdueCallbacks] = useState<FollowUp[]>([]);
   const [campaignRate, setCampaignRate] = useState<{ calls: number; rate: number } | null>(null);
+  const sessionOutcomesRef = useRef<{ total: number; human: number; voicemail: number; no_answer: number }>({ total: 0, human: 0, voicemail: 0, no_answer: 0 });
+  const [showSessionRecap, setShowSessionRecap] = useState(false);
   const [pendingSmsLead, setPendingSmsLead] = useState<{ id: string; name: string; phone: string } | null>(null);
   const smsThenAdvanceRef = useRef<(() => void) | null>(null);
   const [showDTMF, setShowDTMF] = useState(false);
@@ -329,6 +331,11 @@ export default function CampaignDialerPage() {
       await leadsApi.updateDisposition(currentLead.id, dispValue);
       
       toast.success(`Marked as ${dispositionLabel}`);
+      const sess = sessionOutcomesRef.current;
+      sess.total += 1;
+      if (dispValue === 'answered' || dispValue === 'follow_up' || dispValue === 'appointment') sess.human += 1;
+      else if (dispValue === 'voicemail') sess.voicemail += 1;
+      else if (dispValue === 'no_answer' || dispValue === 'busy') sess.no_answer += 1;
       setShowDisposition(false);
 
       // Offer a post-call text before advancing. Dismissing the overlay ALWAYS
@@ -338,6 +345,7 @@ export default function CampaignDialerPage() {
         const isLast = currentIndex >= leads.length - 1;
         if (isLast) {
           toast.success('All leads dialed! 🎉');
+          setShowSessionRecap(true);
           return;
         }
         const dialDelay = Math.min(Math.max(campaign?.auto_dial_delay_ms ?? 1500, 0), 10000);
@@ -719,6 +727,35 @@ export default function CampaignDialerPage() {
               />
 
               {/* Post-Call SMS offer (dismissible; advances power dialer on close) */}
+              {showSessionRecap && (
+                <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
+                  <div className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl space-y-4">
+                    <h3 className="text-lg font-bold text-foreground text-center">Session recap</h3>
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      {(() => {
+                        const sess = sessionOutcomesRef.current;
+                        return [
+                          { label: 'Calls', n: sess.total, c: 'text-foreground' },
+                          { label: 'Human', n: sess.human, c: 'text-emerald-500' },
+                          { label: 'Voicemail', n: sess.voicemail, c: 'text-purple-400' },
+                          { label: 'No answer', n: sess.no_answer, c: 'text-amber-500' },
+                        ].map((x) => (
+                          <div key={x.label} className="p-3 rounded-xl bg-muted">
+                            <div className={`text-2xl font-bold ${x.c}`}>{x.n}</div>
+                            <div className="text-[11px] text-muted-foreground">{x.label}</div>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                    <button
+                      onClick={() => setShowSessionRecap(false)}
+                      className="w-full p-3 rounded-xl bg-foreground text-background text-sm font-bold"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              )}
               <SmsAfterCallOverlay
                 visible={showSmsAfterCall}
                 leadName={pendingSmsLead?.name || ''}
