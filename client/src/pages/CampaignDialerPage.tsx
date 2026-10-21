@@ -70,6 +70,7 @@ export default function CampaignDialerPage() {
   const [overdueCallbacks, setOverdueCallbacks] = useState<FollowUp[]>([]);
   const [campaignRate, setCampaignRate] = useState<{ calls: number; rate: number } | null>(null);
   const sessionOutcomesRef = useRef<{ total: number; human: number; voicemail: number; no_answer: number }>({ total: 0, human: 0, voicemail: 0, no_answer: 0 });
+  const recentlyDialedRef = useRef<Set<string>>(new Set());
   const [showSessionRecap, setShowSessionRecap] = useState(false);
   const [pendingSmsLead, setPendingSmsLead] = useState<{ id: string; name: string; phone: string } | null>(null);
   const smsThenAdvanceRef = useRef<(() => void) | null>(null);
@@ -134,6 +135,16 @@ export default function CampaignDialerPage() {
     if (campaignId) {
       callsStatsApi.get({ campaign_id: campaignId })
         .then((r: any) => setCampaignRate({ calls: r?.data?.total_calls ?? 0, rate: r?.data?.connect_rate ?? 0 }))
+        .catch(() => {});
+      callsApi.list({ campaign_id: campaignId, from: new Date(Date.now() - 24 * 3600 * 1000).toISOString().slice(0, 10), per_page: 100 })
+        .then((r: any) => {
+          const nums = new Set<string>();
+          for (const row of (r?.data || []) as any[]) {
+            const n = String(row.to_number || '').replace(/\D/g, '').slice(-10);
+            if (n) nums.add(n);
+          }
+          recentlyDialedRef.current = nums;
+        })
         .catch(() => {});
     }
   }, [loadData]);
@@ -244,6 +255,11 @@ export default function CampaignDialerPage() {
       return toast.error('Configure a telephony provider in Connectors first.');
     }
     if (voice.connectionStatus !== 'registered') return toast.error('Connecting...');
+    // Redial cooldown: heads-up when this number was already tried today.
+    const digits = String(lead.phone || '').replace(/\D/g, '').slice(-10);
+    if (digits && recentlyDialedRef.current.has(digits)) {
+      toast.info('Heads-up: this number was already dialed today', { duration: 5000 });
+    }
     // autoLog:false — this page logs the call itself with lead_id (attempt
     // counter); the context-level auto-log would double-log the call.
     voice.dial(lead.phone, undefined, { autoLog: false });
