@@ -126,6 +126,18 @@ export default function CampaignDialerPage() {
     }
   }, [campaignId]);
 
+  // Re-pull leads when the tab regains focus (picks up leads imported
+  // mid-session without a manual refresh).
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && campaignId && !['trying', 'ringing', 'active'].includes(voice.primaryCallState)) {
+        loadData();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [loadData, campaignId, voice.primaryCallState]);
+
   useEffect(() => {
     loadData();
     followupsApi.list('open')
