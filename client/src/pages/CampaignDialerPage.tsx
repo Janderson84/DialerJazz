@@ -31,7 +31,7 @@ import { useLocalCalling } from '@/hooks/useLocalCalling';
 import CallControls from '@/components/CallControls';
 import InCallHUD from '@/components/InCallHUD';
 import DispositionOverlay from '@/components/DispositionOverlay';
-import { followupsApi, displayCompany, type FollowUp } from '@/lib/api';
+import { followupsApi, callsStatsApi, displayCompany, type FollowUp } from '@/lib/api';
 import SmsAfterCallOverlay from '@/components/SmsAfterCallOverlay';
 
 type DialerMode = 'power' | 'click';
@@ -68,6 +68,7 @@ export default function CampaignDialerPage() {
   const [isDisposing, setIsDisposing] = useState(false);
   const [showSmsAfterCall, setShowSmsAfterCall] = useState(false);
   const [overdueCallbacks, setOverdueCallbacks] = useState<FollowUp[]>([]);
+  const [campaignRate, setCampaignRate] = useState<{ calls: number; rate: number } | null>(null);
   const [pendingSmsLead, setPendingSmsLead] = useState<{ id: string; name: string; phone: string } | null>(null);
   const smsThenAdvanceRef = useRef<(() => void) | null>(null);
   const [showDTMF, setShowDTMF] = useState(false);
@@ -128,6 +129,11 @@ export default function CampaignDialerPage() {
         setOverdueCallbacks((data || []).filter((f) => new Date(f.due_at).getTime() < Date.now()));
       })
       .catch(() => {});
+    if (campaignId) {
+      callsStatsApi.get({ campaign_id: campaignId })
+        .then((r: any) => setCampaignRate({ calls: r?.data?.total_calls ?? 0, rate: r?.data?.connect_rate ?? 0 }))
+        .catch(() => {});
+    }
   }, [loadData]);
 
   // Track this route for the ActiveCallBubble (so it knows where to return).
@@ -493,6 +499,11 @@ export default function CampaignDialerPage() {
                {dialerSessionMode === 'power' ? <Zap className="h-3 w-3 text-foreground" /> : <MousePointerClick className="h-3 w-3 text-foreground"/>}
                {dialerSessionMode} Mode • {calledLeadsCount + currentIndex + 1} of {totalLeadsCount} leads
              </div>
+            {campaignRate && campaignRate.calls >= 10 && (
+              <div className={`text-[11px] font-semibold ${campaignRate.rate >= 3 ? 'text-emerald-500' : campaignRate.rate >= 1 ? 'text-amber-500' : 'text-red-400'}`}>
+                {campaignRate.rate}% human connect rate ({campaignRate.calls} calls)
+              </div>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
