@@ -100,13 +100,14 @@ router.get('/team-pulse', async (req: AuthenticatedRequest, res: Response, next:
       return nowM === logM;
     };
 
-    const perRep = new Map<string, { calls: number; connected: number; secs: number }>();
+    const perRep = new Map<string, { calls: number; connected: number; secs: number; appts: number }>();
     const CONNECTED = new Set(['answered', 'follow_up', 'not_interested', 'meeting_booked']);
     for (const l of logs) {
       if (!inRange(l.started_at)) continue;
-      const e = perRep.get(l.user_id) || { calls: 0, connected: 0, secs: 0 };
+      const e = perRep.get(l.user_id) || { calls: 0, connected: 0, secs: 0, appts: 0 };
       e.calls += 1;
       if (CONNECTED.has(l.disposition)) e.connected += 1;
+      if (l.disposition === 'appointment') e.appts += 1;
       e.secs += l.duration_seconds || 0;
       perRep.set(l.user_id, e);
     }
@@ -121,6 +122,7 @@ router.get('/team-pulse', async (req: AuthenticatedRequest, res: Response, next:
         calls: e?.calls || 0,
         connected: e?.connected || 0,
         talk_secs: e?.secs || 0,
+        appointments: e?.appts || 0,
         overdue_callbacks: overdueByRep.get(String(m.rep_user_id)) || 0,
       });
     }
@@ -131,9 +133,10 @@ router.get('/team-pulse', async (req: AuthenticatedRequest, res: Response, next:
       name: req.user.name || 'You',
       is_master: true,
       calls: masterEntry?.calls || 0,
-      overdue_callbacks: overdueByRep.get(String(req.user.id)) || 0,
       connected: masterEntry?.connected || 0,
       talk_secs: masterEntry?.secs || 0,
+      appointments: masterEntry?.appts || 0,
+      overdue_callbacks: overdueByRep.get(String(req.user.id)) || 0,
     });
 
     res.json({ data: out });
