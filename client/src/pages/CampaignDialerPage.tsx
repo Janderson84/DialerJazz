@@ -167,6 +167,37 @@ export default function CampaignDialerPage() {
   // navigation so the bubble can show it. It gets cleared when the call ends.
   const isOnCall = ['trying', 'ringing', 'active'].includes(voice.primaryCallState);
 
+  // ── Back-gesture guard ────────────────────────────────────────────
+  // A browser back (trackpad swipe, Android back button) mid-call navigates
+  // away and silently kills the active call. While a call is live, swallow
+  // one back event with a toast; a second back within the same call still
+  // exits (the rep may genuinely want out).
+  const backGuardArmedRef = useRef(false);
+  useEffect(() => {
+    if (!isOnCall) { backGuardArmedRef.current = false; return; }
+    // Push a sentinel entry so the first back pops IT instead of the route.
+    history.pushState({ ccmCallGuard: true }, '');
+    backGuardArmedRef.current = true;
+    const onPop = () => {
+      if (!backGuardArmedRef.current) return;
+      backGuardArmedRef.current = false;
+      toast.error('Call in progress — tap End Call before leaving.', { duration: 4000 });
+      // Re-arm so the next back after the toast still gets caught once.
+      setTimeout(() => {
+        if (['trying', 'ringing', 'active'].includes(voice.primaryCallState)) {
+          history.pushState({ ccmCallGuard: true }, '');
+          backGuardArmedRef.current = true;
+        }
+      }, 100);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      // If the guard entry is still on the stack when the call ends, consume it.
+      if (backGuardArmedRef.current && history.state?.ccmCallGuard) history.back();
+    };
+  }, [isOnCall, voice.primaryCallState]);
+
   // ── Session pause (break button) ──────────────────────────────────
   // Pausing stops the power dialer from auto-dialing the next lead
   // (post-disposition advance, post-SMS advance). Manual dial and
