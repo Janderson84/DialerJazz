@@ -49,6 +49,20 @@ const io = new Server(httpServer, {
   },
 });
 
+// InsForge auth bridge (parity with the Vite dev proxy). The @insforge/sdk
+// posts auth calls to `${origin}/_bf/api/...` because the public tunnel edge
+// blocks the /api/auth path prefix. In production the built client is served
+// by THIS Express app, so /_bf must be proxied here too or login 404s.
+// MUST sit before express.json(): a JSON parser consumes the request stream
+// and the proxy then hangs waiting for a body that will never arrive.
+const { createProxyMiddleware } = await import('http-proxy-middleware');
+app.use('/_bf', createProxyMiddleware({
+  target: process.env.INSFORGE_BACKEND_URL || 'http://127.0.0.1:7130',
+  changeOrigin: true,
+  pathRewrite: (p: string) => p.replace(/^\/_bf/, ''),
+  cookiePathRewrite: { '/api/auth': '/_bf/api/auth' },
+}));
+
 // Middleware
 app.use(cors({
   origin: allowedOrigins,
@@ -96,6 +110,9 @@ const strictLimiter = rateLimit({
 });
 
 app.use('/api', apiLimiter);
+
+// InsForge auth bridge (parity with the Vite dev proxy) — mounted above,
+// BEFORE the JSON body parser (a consumed stream makes the proxy hang).
 
 // API Routes
 app.use('/api/settings', settingsRouter);
