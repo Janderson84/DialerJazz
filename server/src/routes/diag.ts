@@ -31,6 +31,32 @@ router.get('/events', (req: AuthenticatedRequest, res: Response) => {
   res.json({ events: events.slice(-100) });
 });
 
+// Aggregated health readout for master: dial counts, error counts by type,
+// register/recover cycles — enough to spot pacing problems (31206 rate
+// limits correlate with dial speed) without reading raw events.
+router.get('/summary', requireAuth, (req: AuthenticatedRequest, res: Response) => {
+  const since = Date.now() - 6 * 60 * 60 * 1000; // last 6h window
+  const recent = events.filter((e) => Date.now() - new Date(e.ts).getTime() <= since);
+  const count = (name: string) => recent.filter((e) => e.event === name).length;
+  const errors: Record<string, number> = {};
+  for (const e of recent) {
+    if (e.event === 'device.error' || e.event === 'call.error.early') {
+      const kind = (e.detail || 'unknown').split(/[:\s]/)[0];
+      errors[kind] = (errors[kind] || 0) + 1;
+    }
+  }
+  res.json({
+    window_hours: 6,
+    dials: count('voice.dial'),
+    calls_accepted: count('call.accepted'),
+    registers: count('device.register.done') + count('device.re_register.done'),
+    re_register_attempts: count('device.re_register.attempt'),
+    re_register_failures: count('device.re_register.fail'),
+    errors,
+    last_event: recent.length ? recent[recent.length - 1].ts : null,
+  });
+});
+
 
 // ── GET /api/diag/webhooks — per-number wiring check (master only) ──
 // For each number: current voice/sms webhook URLs from Twilio + whether
