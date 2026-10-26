@@ -401,9 +401,17 @@ export default function CampaignDialerPage() {
               if (
                 next &&
                 dialerSessionMode === 'power' &&
+                voice.connectionStatus === 'registered' &&
                 !['trying', 'ringing', 'active'].includes(voice.primaryCallState)
               ) {
                 handleDialForLead(next);
+              } else if (next && voice.connectionStatus !== 'registered') {
+                // Transport is down (rate-limit/transport error) — don't pile
+                // dials onto a dead signaling connection. Hold the session;
+                // the device re-registers in the background and the rep can
+                // hit Resume / retry.
+                toast.error('Reconnecting to Twilio — press Resume to continue dialing.', { duration: 6000 });
+                setIsSessionPaused(true);
               }
             }, dialDelay);
           })();

@@ -133,6 +133,7 @@ const TwilioContext = createContext<TwilioContextValue | null>(null);
 export function TwilioProvider({ children }: { children: ReactNode }) {
   const { user: authUser } = useAuth();
   const deviceRef = useRef<Device | null>(null);
+  const reRegisteringRef = useRef(false);
   const callerNumberRef = useRef<string>('');
 
   // Timers
@@ -386,6 +387,32 @@ export function TwilioProvider({ children }: { children: ReactNode }) {
         console.error('[TwilioContext] Device error:', err);
         diag('device.error', `${err?.name || ''}: ${err?.message || 'unknown'}${err?.causedBy ? ` causedBy=${err.causedBy}` : ''}`);
         setError(`Twilio error: ${err?.message || 'Unknown error'}`);
+
+        // 31206 (rate limit) tears down the signaling transport; the SDK then
+        // spams TransportError 31009 for every retry on the dead transport.
+        // Recovery: back off, then re-register ONCE (guards against loops).
+        const isFatal =
+          err?.name === 'RateExceededError' ||
+          (err?.name === 'TransportError' && String(err?.code) === '31009');
+        if (isFatal && !reRegisteringRef.current) {
+          reRegisteringRef.current = true;
+          setConnectionStatus('reconnecting');
+          const backoffMs = err?.name === 'RateExceededError' ? 10000 : 4000;
+          setTimeout(async () => {
+            try {
+              diag('device.re_register.attempt', `backoff=${backoffMs}ms`);
+              await device.register();
+              diag('device.re_register.done');
+              setConnectionStatus('registered');
+              setError(null);
+            } catch (reErr: any) {
+              diag('device.re_register.fail', String(reErr?.message || reErr).slice(0, 200));
+              setConnectionStatus('disconnected');
+            } finally {
+              reRegisteringRef.current = false;
+            }
+          }, backoffMs);
+        }
       });
 
       device.on('incoming', (call: Call) => {

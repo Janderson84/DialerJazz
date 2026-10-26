@@ -40,7 +40,7 @@ function toE164(number: string): string {
 }
 
 // ── Types ────────────────────────────────────────────────────────────
-export type ConnectionStatus = 'disconnected' | 'connecting' | 'registered';
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'registered' | 'reconnecting';
 export type CallState = 'idle' | 'trying' | 'ringing' | 'active' | 'held' | 'done' | 'hangup';
 
 export interface QualityMetrics {
