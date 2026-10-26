@@ -132,7 +132,12 @@ export default function CampaignsTable({ campaigns }: CampaignsTableProps) {
                  <TableRow key={campaign.id} className="border-black/5 dark:border-white/5 hover:bg-black/[0.02] dark:hover:bg-white/[0.02] cursor-pointer" onClick={() => navigate(`/campaigns/${campaign.id}/manage`)}>
                   {visibleColumns.includes("Campaign") && (
                     <TableCell className="font-semibold whitespace-nowrap">
-                      {campaign.name}
+                      <span
+                        title={campaign.notes || undefined}
+                        className={campaign.notes ? "cursor-help underline decoration-dotted decoration-muted-foreground/40 underline-offset-4" : ""}
+                      >
+                        {campaign.name}
+                      </span>
                     </TableCell>
                   )}
                   {visibleColumns.includes("Owner") && (
