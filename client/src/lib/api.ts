@@ -159,6 +159,9 @@ export const campaignsApi = {
       body: JSON.stringify(config),
     }),
 
+  getPoolHealth: () =>
+    apiFetch<{ data: { campaign_id: string; name: string; status: string; total_leads: number; remaining: number; exhausted: number; dnc: number; remaining_pct: number }[] }>('/campaigns/pool-health'),
+
   updateNotes: (id: string, notes: string) =>
     apiFetch<Campaign>(`/campaigns/${id}/notes`, {
       method: 'PATCH',

@@ -54,6 +54,7 @@ const ITEMS_PER_PAGE = 25;
 export default function CallLogsPage() {
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [stats, setStats] = useState<{ total_calls: number; connected: number; connect_rate: number; dispositions: Record<string, number>; by_campaign?: { campaign_id: string; name: string; calls: number; human: number; rate: number }[] } | null>(null);
+  const [poolHealth, setPoolHealth] = useState<{ campaign_id: string; name: string; remaining_pct: number; remaining: number; total_leads: number }[] | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,7 +82,7 @@ export default function CallLogsPage() {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [statsRes, logsRes, campaignsRes] = await Promise.all([
+      const [statsRes, logsRes, campaignsRes, poolRes] = await Promise.all([
         callsStatsApi.get({
           campaign_id: selectedCampaign || undefined,
           rep: isMaster ? (selectedRep || undefined) : undefined,
@@ -97,13 +98,15 @@ export default function CallLogsPage() {
           page: currentPage,
           per_page: perPage,
         }),
-        campaignsApi.list({ per_page: 100 })
+        campaignsApi.list({ per_page: 100 }),
+        isMaster ? campaignsApi.getPoolHealth().catch(() => null) : Promise.resolve(null),
       ]);
       setCallLogs(logsRes.data);
       setMeta(logsRes.meta);
       if (statsRes) setStats((statsRes as any).data);
       setMetaState({ total: (logsRes.meta as any)?.total ?? 0 });
       setCampaigns(campaignsRes.data);
+      if (poolRes?.data) setPoolHealth((poolRes as any).data);
     } catch (error: any) {
       toast.error(error.message || 'Failed to fetch call logs');
     } finally {
@@ -271,6 +274,20 @@ export default function CallLogsPage() {
               );
             })}
           </div>
+          {isMaster && poolHealth && poolHealth.some(p => p.total_leads > 0 && p.remaining_pct < 25) && !selectedCampaign && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#1F1F23]">
+              <div className="text-xs font-semibold text-muted-foreground mb-2">⚠️ Lead pools running dry (&lt;25% left)</div>
+              <div className="space-y-1">
+                {poolHealth.filter(p => p.total_leads > 0 && p.remaining_pct < 25).map((p) => (
+                  <div key={p.campaign_id} className="flex items-center gap-3 text-xs">
+                    <span className="flex-1 truncate text-foreground">{p.name}</span>
+                    <span className="text-muted-foreground w-24 text-right">{p.remaining} of {p.total_leads} left</span>
+                    <span className={`w-12 text-right font-bold ${p.remaining_pct < 10 ? 'text-red-400' : 'text-amber-500'}`}>{p.remaining_pct}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           {isMaster && (stats.by_campaign?.length || 0) > 1 && !selectedCampaign && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-[#1F1F23]">
               <div className="text-xs font-semibold text-muted-foreground mb-2">Connect rate by campaign</div>

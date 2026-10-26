@@ -75,6 +75,60 @@ router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunct
   }
 });
 
+// GET /api/campaigns/pool-health — lead-pool exhaustion per campaign.
+// Master only: for every campaign, how many of its leads are untouched
+// ('new') vs burned (any dialed-out status). Flags lists that are running
+// dry BEFORE the rep sits down to a wall of dead numbers.
+router.get('/pool-health', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    if (req.user.id !== MASTER_ID()) throw new ApiError(403, 'Master only', 'forbidden');
+
+    const isMaster = true;
+    const camps = await req.db!
+      .database.from('campaigns')
+      .select('id,name,total_leads,status')
+      .neq('status', 'archived');
+    if (camps.error) throw new ApiError(500, camps.error.message, 'db_error');
+
+    const EXHAUSTED = new Set(['no_answer', 'voicemail', 'wrong_number', 'dnc', 'not_interested', 'busy', 'blocked']);
+    const rows = await req.db!
+      .database.from('campaign_leads')
+      .select('campaign_id,status,leads!inner(status)');
+    if (rows.error) throw new ApiError(500, rows.error.message, 'db_error');
+
+    const agg = new Map<string, { total: number; new_leads: number; exhausted: number; dnc: number }>();
+    for (const r of (rows.data || []) as any[]) {
+      const cid = String(r.campaign_id);
+      const a = agg.get(cid) || { total: 0, new_leads: 0, exhausted: 0, dnc: 0 };
+      a.total += 1;
+      const ls = String(r.leads?.status || 'new');
+      if (ls === 'new') a.new_leads += 1;
+      if (EXHAUSTED.has(ls)) a.exhausted += 1;
+      if (ls === 'dnc') a.dnc += 1;
+      agg.set(cid, a);
+    }
+
+    const data = (camps.data || []).map((c: any) => {
+      const a = agg.get(String(c.id)) || { total: 0, new_leads: 0, exhausted: 0, dnc: 0 };
+      const remaining = Math.max(a.total - a.exhausted, 0);
+      return {
+        campaign_id: c.id,
+        name: c.name,
+        status: c.status,
+        total_leads: a.total,
+        remaining,
+        exhausted: a.exhausted,
+        dnc: a.dnc,
+        remaining_pct: a.total ? Math.round((remaining / a.total) * 100) : 0,
+      };
+    }).sort((x: any, y: any) => x.remaining_pct - y.remaining_pct);
+
+    res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     let query = req.db!
