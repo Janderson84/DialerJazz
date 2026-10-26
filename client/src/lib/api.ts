@@ -120,6 +120,7 @@ export interface Campaign {
   total_leads: number;
   leads_called: number;
   auto_dial_delay_ms?: number;
+  notes?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -156,6 +157,12 @@ export const campaignsApi = {
     apiFetch<Campaign>(`/campaigns/${id}/config`, {
       method: 'PATCH',
       body: JSON.stringify(config),
+    }),
+
+  updateNotes: (id: string, notes: string) =>
+    apiFetch<Campaign>(`/campaigns/${id}/notes`, {
+      method: 'PATCH',
+      body: JSON.stringify({ notes }),
     }),
 
   rename: (id: string, name: string) =>

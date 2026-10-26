@@ -18,6 +18,8 @@ export default function CampaignManagePage() {
   const [dialerMode, setDialerMode] = useState<string>('click');
   const [provider, setProvider] = useState<'telnyx' | 'twilio' | 'local'>('twilio');
   const [callerNumber, setCallerNumber] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
 
   const [telnyxNumbers, setTelnyxNumbers] = useState<{ phone_number: string; friendly_name: string }[]>([]);
   const [twilioNumbers, setTwilioNumbers] = useState<{ phone_number: string; friendly_name: string }[]>([]);
@@ -40,6 +42,7 @@ export default function CampaignManagePage() {
         setAutoDialDelayMs(camp.auto_dial_delay_ms ?? 1500);
         setProvider(camp.provider || 'twilio');
         setCallerNumber(camp.caller_number || '');
+        setNotes(camp.notes || '');
 
         if (tnNumRes.data) setTelnyxNumbers(tnNumRes.data as any);
         if (twNumRes.data) setTwilioNumbers(twNumRes.data as any);
@@ -73,6 +76,20 @@ export default function CampaignManagePage() {
       toast.error(err.message || 'Failed to save configuration');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    if (!id) return;
+    setIsSavingNotes(true);
+    try {
+      const res = await campaignsApi.updateNotes(id, notes);
+      setCampaign(res.data);
+      toast.success('Notes saved');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save notes');
+    } finally {
+      setIsSavingNotes(false);
     }
   };
 
@@ -278,6 +295,32 @@ export default function CampaignManagePage() {
              </button>
            )}
          </div>
+      </div>
+
+      {/* Notes */}
+      <div className="bg-surface border border-black/5 dark:border-white/5 rounded-[1.5rem] p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-foreground">Notes</h2>
+            <p className="text-sm text-muted-foreground">Context for this campaign — why it exists, who owns the list, what to watch for.</p>
+          </div>
+          <button
+            onClick={handleSaveNotes}
+            disabled={isSavingNotes}
+            className="px-5 py-2.5 bg-foreground hover:opacity-90 text-background rounded-[0.85rem] text-sm font-medium transition-all flex items-center gap-2 shadow-sm"
+          >
+            {isSavingNotes ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Save Notes
+          </button>
+        </div>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={3}
+          maxLength={2000}
+          placeholder="e.g. Purchased list from X on Oct 10 — verify numbers before dialing, 10% wrong numbers last time."
+          className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-foreground/10 resize-y"
+        />
       </div>
 
       {/* Configuration Settings */}

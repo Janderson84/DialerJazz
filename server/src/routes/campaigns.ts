@@ -248,6 +248,28 @@ router.patch('/:id/rename', async (req: AuthenticatedRequest, res: Response, nex
   }
 });
 
+// Free-form notes a master can leave on a campaign (context: why it exists,
+// who owns the list, what to do with it). Editable at any status.
+router.patch('/:id/notes', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const notesSchema = z.object({ notes: z.string().max(2000) });
+    const { notes } = notesSchema.parse(req.body);
+
+    const { data, error } = await req.db!
+      .database.from('campaigns')
+      .update({ notes, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .eq('user_id', req.user.id)
+      .select()
+      .single();
+
+    if (error) throw new ApiError(500, error.message, 'db_error');
+    res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.delete('/:id', async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     // Delete the campaign (Supabase cascade deletes leads if configured, otherwise we just delete campaign)
