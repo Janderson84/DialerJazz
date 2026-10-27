@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Phone, Users, Clock, Plus, Wifi, WifiOff, Loader2, FolderOpen, Wallet, CreditCard, CalendarClock, Check, X, PhoneCall } from 'lucide-react';
+import { FileText, Phone, Users, Clock, Plus, Wifi, WifiOff, Loader2, FolderOpen, Wallet, CreditCard, CalendarClock, Check, X, PhoneCall, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import CampaignsTable from '@/components/CampaignsTable';
-import { campaignsApi, settingsApi, statsApi, followupsApi, type Campaign, type FollowUp } from '@/lib/api';
+import { campaignsApi, settingsApi, statsApi, followupsApi, apiFetch, type Campaign, type FollowUp } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 type TeamPulseRow = { rep_user_id: string; name: string; is_master: boolean; calls: number; connected: number; talk_secs: number; appointments?: number; overdue_callbacks?: number };
 
@@ -18,6 +19,9 @@ export default function Dashboard() {
   const [isTelnyxConnected, setIsTelnyxConnected] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [teamPulse, setTeamPulse] = useState<TeamPulseRow[]>([]);
+  const [voiceHealth, setVoiceHealth] = useState<{ dials: number; calls_accepted: number; registers: number; re_register_attempts: number; errors: Record<string, number> } | null>(null);
+  const { user } = useAuth();
+  const isMaster = user?.id === 'a4d41720-59e1-4850-8b15-e8841872e702';
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
 
   const fetchCampaigns = useCallback(async () => {
@@ -69,13 +73,24 @@ export default function Dashboard() {
     }
   }, []);
 
+  const fetchVoiceHealth = useCallback(async () => {
+    if (!isMaster) return;
+    try {
+      const { data } = await apiFetch<any>('/diag/summary');
+      setVoiceHealth(data?.data || data);
+    } catch {
+      // non-fatal
+    }
+  }, [isMaster]);
+
   useEffect(() => {
     fetchCampaigns();
     fetchSettings();
     fetchStats();
     fetchTeamPulse();
     fetchFollowUps();
-  }, [fetchCampaigns, fetchSettings, fetchStats, fetchTeamPulse, fetchFollowUps]);
+    fetchVoiceHealth();
+  }, [fetchCampaigns, fetchSettings, fetchStats, fetchTeamPulse, fetchFollowUps, fetchVoiceHealth]);
 
   const completeFollowUp = async (id: string) => {
     setFollowUps(prev => prev.filter(f => f.id !== id));
@@ -273,6 +288,32 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+        )}
+
+        {/* Voice Health Card (master) */}
+        {isMaster && voiceHealth && (
+          <div className="bg-white dark:bg-[#0F0F12] rounded-xl p-6 border border-gray-200 dark:border-[#1F1F23]">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 text-left flex items-center gap-2">
+              <Activity className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-50" />
+              Voice health — last 6h
+            </h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+              <div><p className="text-2xl font-bold">{voiceHealth.dials}</p><p className="text-xs text-muted-foreground">dials</p></div>
+              <div><p className="text-2xl font-bold">{voiceHealth.calls_accepted}</p><p className="text-xs text-muted-foreground">connected</p></div>
+              <div><p className="text-2xl font-bold">{voiceHealth.registers}</p><p className="text-xs text-muted-foreground">registers</p></div>
+              <div>
+                <p className={`text-2xl font-bold ${Object.keys(voiceHealth.errors || {}).length ? 'text-red-400' : 'text-emerald-500'}`}>
+                  {Object.values(voiceHealth.errors || {}).reduce((a: number, b: any) => a + Number(b || 0), 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">SDK errors</p>
+              </div>
+            </div>
+            {Object.keys(voiceHealth.errors || {}).length > 0 && (
+              <p className="text-xs text-muted-foreground mt-3">
+                {Object.entries(voiceHealth.errors).map(([k, v]) => `${k} (${v})`).join(' · ')}
+              </p>
+            )}
+          </div>
         )}
 
         {/* Team Pulse Card */}
