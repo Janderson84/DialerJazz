@@ -18,8 +18,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ButtonColorful } from "@/components/ui/button-colorful";
+import { apiFetch } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Campaign } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 
@@ -38,6 +39,17 @@ const allColumns = [
 
 export default function CampaignsTable({ campaigns }: CampaignsTableProps) {
   const [visibleColumns, setVisibleColumns] = useState<string[]>([...allColumns]);
+  const [dryPools, setDryPools] = useState<Record<string, { remaining: number; total_leads: number; remaining_pct: number }>>({});
+
+  useEffect(() => {
+    // Master only: fetch lead-pool health so exhausted lists get flagged.
+    apiFetch<any>('/campaigns/pool-health').then((res) => {
+      const rows = res?.data?.data || res?.data || [];
+      const map: Record<string, any> = {};
+      for (const p of rows) map[p.campaign_id] = p;
+      setDryPools(map);
+    }).catch(() => {});
+  }, [campaigns]);
   const [statusFilter, setStatusFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
   const navigate = useNavigate();
@@ -138,6 +150,14 @@ export default function CampaignsTable({ campaigns }: CampaignsTableProps) {
                       >
                         {campaign.name}
                       </span>
+                      {dryPools[campaign.id] && dryPools[campaign.id].total_leads > 0 && dryPools[campaign.id].remaining_pct < 25 && (
+                        <span
+                          title={`Only ${dryPools[campaign.id].remaining} of ${dryPools[campaign.id].total_leads} leads left untried — refresh this list.`}
+                          className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-500/10 text-red-400"
+                        >
+                          {dryPools[campaign.id].remaining_pct}% left
+                        </span>
+                      )}
                     </TableCell>
                   )}
                   {visibleColumns.includes("Owner") && (
