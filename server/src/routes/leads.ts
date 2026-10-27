@@ -347,4 +347,78 @@ router.patch('/:id/disposition', async (req: AuthenticatedRequest, res: Response
   }
 });
 
+// GET /api/leads/export — CSV of the current leads view (search/status/
+// min_attempts). Same filters as the list endpoint; ?token= auth for
+// browser downloads.
+router.get('/export', requireAuth, async (req: AuthenticatedRequest & { user?: any }, res: Response, next: NextFunction) => {
+  try {
+    const search = req.query.search as string | undefined;
+    const status = req.query.status as string | undefined;
+    const minAttempts = Math.max(0, Number(req.query.min_attempts) || 0);
+
+    let query = req.db!.database
+      .from('leads')
+      .select('*')
+      .eq('user_id', req.user.id);
+
+    if (search && search.trim()) {
+      const searchTerm = `%${search.trim()}%`;
+      query = query.or(`first_name.ilike.*${searchTerm}*,last_name.ilike.*${searchTerm}*,company.ilike.*${searchTerm}*,email.ilike.*${searchTerm}*,phone.ilike.*${searchTerm}*`);
+    }
+    if (status && status.trim()) query = query.eq('status', status);
+
+    if (minAttempts > 0) {
+      const admin0 = await adminFetch();
+      const clRes = await fetch(
+        `${admin0.base}/api/database/records/call_logs?lead_id=not.is.null&select=lead_id&limit=5000`,
+        { headers: admin0.headers() }
+      ).catch(() => null);
+      let idSet: string[] = [];
+      if (clRes && clRes.ok) {
+        const rows = ((await clRes.json()) || []) as any[];
+        const counts = new Map<string, number>();
+        for (const r of rows) counts.set(String(r.lead_id), (counts.get(String(r.lead_id)) || 0) + 1);
+        idSet = [...counts.entries()].filter(([, n]) => n >= minAttempts).map(([id]) => id);
+      }
+      if (!idSet.length) { res.header('Content-Type', 'text/csv'); return res.send('no rows'); }
+      query = query.in('id', idSet);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(5000);
+    if (error) throw new ApiError(500, error.message, 'db_error');
+
+    // attempts per lead for context
+    const attemptsByLead = new Map<string, number>();
+    if ((data || []).length) {
+      const idsCsv = (data as any[]).map((l) => `"${l.id}"`).join(',');
+      const admin = await adminFetch();
+      const clRes = await fetch(
+        `${admin.base}/api/database/records/call_logs?lead_id=in.(${idsCsv})&select=lead_id&limit=5000`,
+        { headers: admin.headers() }
+      ).catch(() => null);
+      if (clRes && clRes.ok) {
+        for (const r of ((await clRes.json()) || []) as any[]) {
+          attemptsByLead.set(String(r.lead_id), (attemptsByLead.get(String(r.lead_id)) || 0) + 1);
+        }
+      }
+    }
+
+    const esc = (v: any) => {
+      const s = v === null || v === undefined ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const header = 'first_name,last_name,company,phone,email,state,status,tags,call_attempts,created_at';
+    const lines = (data || []).map((l: any) => [
+      esc(l.first_name), esc(l.last_name), esc(l.company), esc(l.phone), esc(l.email),
+      esc(l.state), esc(l.status), esc((l.tags || []).join('; ')), esc(attemptsByLead.get(String(l.id)) || 0), esc(l.created_at),
+    ].join(','));
+
+    res.header('Content-Type', 'text/csv');
+    res.header('Content-Disposition', `attachment; filename="leads-export-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send([header, ...lines].join('\n'));
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

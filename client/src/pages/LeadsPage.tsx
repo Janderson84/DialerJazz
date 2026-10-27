@@ -111,6 +111,23 @@ export default function LeadsPage() {
         </div>
       </div>
 
+      {/* Export CSV (respects current filters incl. 3+ dials) */}
+      <div className="flex justify-end -mb-2">
+        <button
+          onClick={() => {
+            const q = new URLSearchParams();
+            if (searchTerm) q.set('search', searchTerm);
+            if (statusFilter) q.set('status', statusFilter);
+            if (deadFilter) q.set('min_attempts', '3');
+            const token = localStorage.getItem('jazz_access_token') || '';
+            window.open(`/api/leads/export?${q.toString()}&token=${encodeURIComponent(token)}`, '_blank');
+          }}
+          className="text-xs font-semibold text-muted-foreground hover:text-foreground underline transition-colors"
+        >
+          Export CSV
+        </button>
+      </div>
+
       {/* Search & Filters Row */}
       <div className="flex flex-col sm:flex-row gap-3">
         {/* Search Input */}
