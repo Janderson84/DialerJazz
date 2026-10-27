@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Users as UsersIcon, Search, Loader2, Filter, X, Globe, MapPin, Star, Tag as TagIcon, MessageSquare } from 'lucide-react';
+import { Users as UsersIcon, Search, Loader2, Filter, X, Globe, MapPin, Star, Tag as TagIcon, MessageSquare, Phone } from 'lucide-react';
 import Pagination from '@/components/ui/pagination';
 import { NewMessageDialog } from './MessagesPage';
 import { usePagination } from '@/hooks/usePagination';
 import { toast } from 'sonner';
-import { leadsApi, type Lead } from '@/lib/api';
+import { leadsApi, callsApi, type Lead } from '@/lib/api';
 import { displayCompany } from '@/lib/api';
 
 const ITEMS_PER_PAGE = 25;
@@ -44,6 +44,9 @@ export default function LeadsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [deadFilter, setDeadFilter] = useState(false);
+  const [historyLead, setHistoryLead] = useState<any | null>(null);
+  const [historyCalls, setHistoryCalls] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
   const [smsTo, setSmsTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -75,6 +78,19 @@ export default function LeadsPage() {
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
+
+  const openHistory = useCallback(async (lead: any) => {
+    setHistoryLead(lead);
+    setHistoryLoading(true);
+    try {
+      const { data } = await callsApi.list({ lead_id: lead.id, per_page: 50 });
+      setHistoryCalls(data || []);
+    } catch {
+      setHistoryCalls([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -251,7 +267,7 @@ export default function LeadsPage() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {leads.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-white/[0.02] transition-colors">
+                    <tr key={lead.id} onClick={() => openHistory(lead)} className="hover:bg-white/[0.02] transition-colors cursor-pointer">
                       {/* Name / Company */}
                       <td className="px-4 py-4">
                         <div className="font-medium text-foreground">
@@ -399,6 +415,41 @@ export default function LeadsPage() {
           <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
         </>
       )}
+      {/* Lead history drawer */}
+      {historyLead && (
+        <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setHistoryLead(null)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative bg-background border-l border-black/5 dark:border-white/5 w-full max-w-md h-full overflow-auto p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-foreground">{[historyLead.first_name, historyLead.last_name].filter(Boolean).join(' ') || historyLead.company || 'Lead'}</h3>
+                <p className="text-sm text-muted-foreground">{historyLead.company || ''} {historyLead.state ? `· ${historyLead.state}` : ''}</p>
+                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {historyLead.phone}</p>
+              </div>
+              <button onClick={() => setHistoryLead(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+            </div>
+            {historyLoading ? (
+              <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            ) : historyCalls.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-8 text-center">No calls logged for this lead yet.</p>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{historyCalls.length} calls</p>
+                {historyCalls.map((c) => (
+                  <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-black/5 dark:border-white/5 bg-surface px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium capitalize">{(c.disposition || 'unknown').replace('_', ' ')}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(c.started_at || c.created_at).toLocaleString()} · {c.duration_seconds || 0}s</p>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">{c.direction === 'inbound' ? 'in' : 'out'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <NewMessageDialog
         open={smsOpen}
         onClose={() => setSmsOpen(false)}
