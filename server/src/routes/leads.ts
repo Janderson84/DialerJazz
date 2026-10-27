@@ -46,11 +46,33 @@ router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunct
     const search = req.query.search as string | undefined;
     const status = req.query.status as string | undefined;
     const tags = req.query.tags as string | undefined;
-
     let query = req.db!.database
       .from('leads')
       .select('*', { count: 'exact' })
       .eq('user_id', req.user.id);
+
+    const minAttempts = Math.max(0, Number(req.query.min_attempts) || 0);
+    // Filter to leads dialed at least N times: compute from call_logs first,
+    // then constrain the leads query to that id set (PostgREST has no
+    // server-side group-by through this client).
+    if (minAttempts > 0) {
+      const admin0 = await adminFetch();
+      const clRes = await fetch(
+        `${admin0.base}/api/database/records/call_logs?lead_id=not.is.null&select=lead_id&limit=5000`,
+        { headers: admin0.headers() }
+      ).catch(() => null);
+      let idSet: string[] = [];
+      if (clRes && clRes.ok) {
+        const rows = ((await clRes.json()) || []) as any[];
+        const counts = new Map<string, number>();
+        for (const r of rows) counts.set(String(r.lead_id), (counts.get(String(r.lead_id)) || 0) + 1);
+        idSet = [...counts.entries()].filter(([, n]) => n >= minAttempts).map(([id]) => id);
+      }
+      if (!idSet.length) {
+        return res.json({ data: [], meta: { total: 0, page, per_page: perPage, total_pages: 0 } });
+      }
+      query = query.in('id', idSet);
+    }
 
     // Server-side search across name, company, email, and phone
     if (search && search.trim()) {

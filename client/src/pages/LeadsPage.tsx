@@ -43,6 +43,7 @@ export default function LeadsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [deadFilter, setDeadFilter] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
   const [smsTo, setSmsTo] = useState('');
   const [showFilters, setShowFilters] = useState(false);
@@ -60,6 +61,7 @@ export default function LeadsPage() {
         per_page: perPage,
         search: debouncedSearch,
         status: statusFilter || undefined,
+        min_attempts: deadFilter ? 3 : undefined,
       });
       setLeads(data);
       setMeta(meta);
@@ -68,7 +70,7 @@ export default function LeadsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, perPage, debouncedSearch, statusFilter, setMeta]);
+  }, [currentPage, perPage, debouncedSearch, statusFilter, deadFilter, setMeta]);
 
   useEffect(() => {
     fetchLeads();
@@ -97,7 +99,7 @@ export default function LeadsPage() {
     setCurrentPage(1);
   };
 
-  const hasActiveFilters = searchTerm || statusFilter;
+  const hasActiveFilters = searchTerm || statusFilter || deadFilter;
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -133,6 +135,16 @@ export default function LeadsPage() {
         >
           <Filter className="h-4 w-4" />
           <span className="hidden sm:inline">Filters</span>
+          <button
+            onClick={() => { setDeadFilter(v => !v); setCurrentPage(1); }}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+              deadFilter
+                ? 'bg-red-500/10 text-red-400 border-red-500/30'
+                : 'bg-surface border-black/5 dark:border-white/5 text-muted-foreground hover:border-foreground/30 hover:text-foreground'
+            }`}
+          >
+            ☎️ 3+ dials
+          </button>
           {statusFilter && (
             <span className="h-2 w-2 rounded-full bg-background" />
           )}

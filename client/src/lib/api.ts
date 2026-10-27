@@ -212,6 +212,7 @@ export interface LeadsFilterParams extends PaginationParams {
   search?: string;
   status?: string;
   tags?: string;
+  min_attempts?: number;
 }
 
 export const leadsApi = {
@@ -222,6 +223,7 @@ export const leadsApi = {
     if (params?.search) query.set('search', params.search);
     if (params?.status) query.set('status', params.status);
     if (params?.tags) query.set('tags', params.tags);
+    if (params?.min_attempts) query.set('min_attempts', String(params.min_attempts));
     const qs = query.toString();
     return apiFetch<Lead[]>(qs ? `/leads?${qs}` : '/leads') as Promise<PaginatedResponse<Lead>>;
   },
