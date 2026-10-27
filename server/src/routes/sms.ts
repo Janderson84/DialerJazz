@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import { getMasterTwilioSettings, MASTER_ID } from '../lib/masterSettings.js';
@@ -247,6 +247,7 @@ router.post('/send', requireAuth, async (req: AuthenticatedRequest, res, next) =
           from_number: await senderNumberFor(userId).catch(() => ''),
           to_number: toE164,
           body: rendered,
+          template_id: template_id || null,
           status: 'scheduled',
           scheduled_for: when.toISOString(),
         }),
@@ -279,6 +280,7 @@ router.post('/send', requireAuth, async (req: AuthenticatedRequest, res, next) =
         body: JSON.stringify({
           user_id: userId, lead_id: lead_id || null, direction: 'outbound',
           from_number: fromNumber, to_number: toE164, body: rendered,
+          template_id: template_id || null,
           status: 'failed', error_message: twJson?.message || `Twilio error ${twRes.status}`,
         }),
       }).catch(() => null);
@@ -296,6 +298,7 @@ router.post('/send', requireAuth, async (req: AuthenticatedRequest, res, next) =
         from_number: fromNumber,
         to_number: toE164,
         body: rendered,
+        template_id: template_id || null,
         status: twJson.status || 'sent',
         twilio_sid: twJson.sid,
       }),
@@ -390,6 +393,70 @@ router.patch('/threads/:peer/status', requireAuth, async (req: AuthenticatedRequ
     }
     res.json({ data: { ok: true, status } });
   } catch (e) { next(e); }
+});
+
+// ══ Template analytics ═════════════════════════════════════════════
+// Per-template usage + outcomes: sends, delivery rate, and whether the
+// lead ever replied afterwards. Master sees the whole team; reps see
+// their own rows.
+router.get('/template-stats', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const isMaster = req.user!.id === MASTER_ID();
+    const admin = await adminFetch();
+    const url = `${admin.base}/api/database/records/sms_messages?direction=eq.outbound&template_id=not.is.null&order=created_at.desc&limit=1000${isMaster ? '' : `&user_id=eq.${req.user!.id}`}`;
+    const r = await fetch(url, { headers: admin.headers() });
+    if (!r.ok) throw new ApiError(500, 'Failed to load messages', 'db_error');
+    const msgs = ((await r.json()) || []) as any[];
+
+    // Reply detection: any inbound message from the same lead AFTER the send
+    const inbound = await fetch(
+      `${admin.base}/api/database/records/sms_messages?direction=eq.inbound&order=created_at.desc&limit=1000`,
+      { headers: admin.headers() }
+    ).then((x) => (x.ok ? (x.json() as Promise<any[]>) : []));
+    const inboundByLead = new Map<string, string[]>();
+    for (const m of inbound) {
+      const leadKey = m.lead_id ? String(m.lead_id) : String(m.from_number || '');
+      const list = inboundByLead.get(leadKey) || [];
+      list.push(m.created_at);
+      inboundByLead.set(leadKey, list);
+    }
+
+    const byTpl = new Map<string, { sends: number; delivered: number; failed: number; replies: number }>();
+    for (const m of msgs) {
+      const key = String(m.template_id);
+      const a = byTpl.get(key) || { sends: 0, delivered: 0, failed: 0, replies: 0 };
+      a.sends += 1;
+      if (m.status === 'delivered') a.delivered += 1;
+      if (m.status === 'failed' || m.status === 'undelivered') a.failed += 1;
+      const leadKey = m.lead_id ? String(m.lead_id) : String(m.to_number || '');
+      const replies = inboundByLead.get(leadKey) || [];
+      if (replies.some((ts) => new Date(ts) >= new Date(m.created_at))) a.replies += 1;
+      byTpl.set(key, a);
+    }
+
+    // Join template names
+    const ids = [...byTpl.keys()];
+    const tplRes = await fetch(
+      `${admin.base}/api/database/records/sms_templates?id=in.(${ids.join(',')})`,
+      { headers: admin.headers() }
+    ).catch(() => null);
+    const tpls = tplRes && tplRes.ok ? ((await tplRes.json()) || []) as any[] : [];
+    const nameById = new Map(tpls.map((t: any) => [String(t.id), String(t.name || 'Unnamed')]));
+
+    const data = [...byTpl.entries()].map(([id, a]) => ({
+      template_id: id,
+      name: nameById.get(id) || 'Deleted template',
+      sends: a.sends,
+      delivered: a.delivered,
+      failed: a.failed,
+      replies: a.replies,
+      reply_rate: a.sends ? Math.round((a.replies / a.sends) * 1000) / 10 : 0,
+    })).sort((x, y) => y.sends - x.sends);
+
+    res.json({ data });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ══ Scheduled sweep ═════════════════════════════════════════════════
