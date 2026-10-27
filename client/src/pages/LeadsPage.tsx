@@ -436,12 +436,22 @@ export default function LeadsPage() {
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{historyCalls.length} calls</p>
                 {historyCalls.map((c) => (
-                  <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-black/5 dark:border-white/5 bg-surface px-3 py-2.5">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium capitalize">{(c.disposition || 'unknown').replace('_', ' ')}</p>
-                      <p className="text-xs text-muted-foreground">{new Date(c.started_at || c.created_at).toLocaleString()} · {c.duration_seconds || 0}s</p>
+                  <div key={c.id} className="rounded-xl border border-black/5 dark:border-white/5 bg-surface px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium capitalize">{(c.disposition || 'unknown').replace('_', ' ')}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(c.started_at || c.created_at).toLocaleString()} · {c.duration_seconds || 0}s</p>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">{c.direction === 'inbound' ? 'in' : 'out'}</span>
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">{c.direction === 'inbound' ? 'in' : 'out'}</span>
+                    {c.call_sid && c.recording_url && (
+                      <audio
+                        controls
+                        preload="none"
+                        className="mt-2 w-full h-8"
+                        src={`/api/calls/recording/${c.call_sid}?token=${encodeURIComponent(localStorage.getItem('jazz_access_token') || '')}`}
+                      />
+                    )}
                   </div>
                 ))}
               </div>

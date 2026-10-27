@@ -585,3 +585,51 @@ router.get('/export', async (req: AuthenticatedRequest, res, next) => {
 
 
 export default router;
+
+// ── GET /api/calls/recording/:callSid — authenticated recording proxy ──
+// Twilio recording media requires account basic-auth; browsers can't play
+// the stored URLs directly. Authenticated app users (master or the owning
+// rep) stream the mp3 through here. Supports ?token= for <audio> src.
+router.get('/recording/:callSid', async (req: AuthenticatedRequest, res, next) => {
+  if (req.query.token && !req.headers.authorization) {
+    req.headers.authorization = `Bearer ${req.query.token}`;
+  }
+  return requireAuth(req as any, res as any, next as any);
+}, async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const callSid = String(req.params.callSid || '');
+    if (!/^CA[0-9a-f]{32}$/i.test(callSid)) throw new ApiError(400, 'Invalid call sid', 'bad_request');
+
+    // Access check: the call must belong to the requester (or requester is master).
+    const admin = await adminFetch();
+    const own = await fetch(`${admin.base}/api/database/records/call_logs?call_sid=eq.${callSid}&select=user_id&limit=1`, { headers: admin.headers() });
+    const payload: any = await own.json().catch(() => null);
+    const rows = (Array.isArray(payload) ? payload : payload?.data || []) as any[];
+    const rec = rows[0];
+    if (!rec) throw new ApiError(404, 'Call not found', 'not_found');
+    if (req.user!.id !== MASTER_ID() && rec.user_id !== req.user!.id) throw new ApiError(403, 'Forbidden', 'forbidden');
+
+    const master = await getMasterTwilioSettings();
+    const acct = master?.twilio_account_sid || '';
+    const tok = master?.twilio_auth_token || '';
+    if (!acct || !tok) throw new ApiError(503, 'Twilio not connected', 'no_twilio');
+
+    const listRes = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${acct}/Recordings.json?CallSid=${callSid}&PageSize=5`,
+      { headers: { Authorization: 'Basic ' + Buffer.from(`${acct}:${tok}`).toString('base64') } }
+    );
+    if (!listRes.ok) throw new ApiError(502, 'Twilio list failed', 'twilio_error');
+    const list = await listRes.json();
+    const media = list?.recordings?.[0];
+    if (!media) throw new ApiError(404, 'No recording for this call', 'no_recording');
+
+    const audio = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${acct}/Recordings/${media.sid}.mp3?Download=true`, {
+      headers: { Authorization: 'Basic ' + Buffer.from(`${acct}:${tok}`).toString('base64') },
+    });
+    if (!audio.ok || !audio.body) throw new ApiError(502, 'Twilio media failed', 'twilio_error');
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    const buf = Buffer.from(await audio.arrayBuffer());
+    res.send(buf);
+  } catch (e) { next(e); }
+});
