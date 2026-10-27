@@ -433,9 +433,22 @@ export interface SmsAutoReply {
   business_hours?: { start: string; end: string; tz?: string };
 }
 
+export interface SmsTemplateStat {
+  template_id: string;
+  name: string;
+  sends: number;
+  delivered: number;
+  failed: number;
+  replies: number;
+  reply_rate: number;
+}
+
 export const smsApi = {
   listTemplates: () =>
     apiFetch<SmsTemplate[]>('/sms/templates'),
+
+  templateStats: () =>
+    apiFetch<SmsTemplateStat[]>('/sms/template-stats'),
 
   createTemplate: (name: string, body: string) =>
     apiFetch<SmsTemplate>('/sms/templates', {

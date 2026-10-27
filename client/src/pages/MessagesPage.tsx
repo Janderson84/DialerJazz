@@ -5,7 +5,7 @@ import {
   Timer, Zap, Copy,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { smsApi, type SmsMessage, type SmsTemplate, type SmsAutoReply } from '@/lib/api';
+import { smsApi, type SmsMessage, type SmsTemplate, type SmsTemplateStat, type SmsAutoReply } from '@/lib/api';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -461,6 +461,7 @@ function ThreadView({ peer, msgs, loading, status, onBack, onToggleStatus, onSen
 
 function TemplatesTab() {
   const [templates, setTemplates] = useState<SmsTemplate[]>([]);
+  const [statsById, setStatsById] = useState<Record<string, SmsTemplateStat>>({});
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<SmsTemplate | null>(null);
   const [creating, setCreating] = useState(false);
@@ -469,6 +470,11 @@ function TemplatesTab() {
     try {
       const { data } = await smsApi.listTemplates();
       setTemplates(data || []);
+      smsApi.templateStats().then(({ data: st }) => {
+        const map: Record<string, SmsTemplateStat> = {};
+        for (const s of st || []) map[s.template_id] = s;
+        setStatsById(map);
+      }).catch(() => {});
     } catch (e: any) {
       toast.error(e?.message || 'Failed to load templates');
     } finally {
@@ -510,6 +516,14 @@ function TemplatesTab() {
                 <div className="min-w-0">
                   <p className="font-semibold text-foreground">{t.name}</p>
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{t.body}</p>
+                  {statsById[t.id] && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {statsById[t.id].sends} sent · {statsById[t.id].delivered} delivered ·{' '}
+                      <span className={statsById[t.id].reply_rate >= 10 ? 'text-emerald-500 font-semibold' : ''}>
+                        {statsById[t.id].reply_rate}% replied
+                      </span>
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-1 shrink-0">
                   <Button variant="ghost" size="icon" onClick={() => setEditing(t)} title="Edit"><Pencil className="h-4 w-4" /></Button>
