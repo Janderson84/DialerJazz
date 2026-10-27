@@ -77,10 +77,38 @@ router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunct
 
     if (error) throw new ApiError(500, error.message, 'db_error');
 
+    // Call-attempt counts for the page's leads (how many times each was
+    // dialed + last outcome) so dead numbers are visible at a glance.
+    const pageIds = (data || []).map((l: any) => l.id);
+    let attemptsByLead: Record<string, { attempts: number; last_disposition: string | null }> = {};
+    if (pageIds.length) {
+      const idsCsv = pageIds.map((id: string) => `"${id}"`).join(',');
+      const admin = await adminFetch();
+      const clRes = await fetch(
+        `${admin.base}/api/database/records/call_logs?lead_id=in.(${idsCsv})&select=lead_id,disposition&order=created_at.desc&limit=1000`,
+        { headers: admin.headers() }
+      ).catch(() => null);
+      if (clRes && clRes.ok) {
+        const rows = ((await clRes.json()) || []) as any[];
+        for (const r of rows) {
+          const key = String(r.lead_id);
+          const a = attemptsByLead[key] || { attempts: 0, last_disposition: null };
+          a.attempts += 1;
+          if (!a.last_disposition) a.last_disposition = r.disposition || null;
+          attemptsByLead[key] = a;
+        }
+      }
+    }
+    const withAttempts = (data || []).map((l: any) => ({
+      ...l,
+      call_attempts: attemptsByLead[String(l.id)]?.attempts || 0,
+      last_disposition: attemptsByLead[String(l.id)]?.last_disposition || null,
+    }));
+
     const total = count || 0;
 
     res.json({
-      data: data || [],
+      data: withAttempts,
       meta: {
         total,
         page,

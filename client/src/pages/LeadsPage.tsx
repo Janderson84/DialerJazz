@@ -338,9 +338,23 @@ export default function LeadsPage() {
 
                       {/* Status */}
                       <td className="px-4 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${getStatusColor(lead.status)}`}>
-                          {lead.status.replace('_', ' ')}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wider border ${getStatusColor(lead.status)}`}>
+                            {lead.status.replace('_', ' ')}
+                          </span>
+                          {(lead as any).call_attempts > 0 && (
+                            <span
+                              title={`Dialed ${(lead as any).call_attempts}x — last: ${(lead as any).last_disposition?.replace('_', ' ') || 'unknown'}`}
+                              className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                (lead as any).call_attempts >= 3
+                                  ? 'bg-red-500/10 text-red-400'
+                                  : 'bg-muted text-muted-foreground'
+                              }`}
+                            >
+                              {(lead as any).call_attempts}×
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Date */}
