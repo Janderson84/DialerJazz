@@ -4,7 +4,7 @@ import Pagination from '@/components/ui/pagination';
 import { NewMessageDialog } from './MessagesPage';
 import { usePagination } from '@/hooks/usePagination';
 import { toast } from 'sonner';
-import { leadsApi, callsApi, type Lead } from '@/lib/api';
+import { leadsApi, callsApi, smsApi, type Lead } from '@/lib/api';
 import { displayCompany } from '@/lib/api';
 
 const ITEMS_PER_PAGE = 25;
@@ -46,6 +46,7 @@ export default function LeadsPage() {
   const [deadFilter, setDeadFilter] = useState(false);
   const [historyLead, setHistoryLead] = useState<any | null>(null);
   const [historyCalls, setHistoryCalls] = useState<any[]>([]);
+  const [historySms, setHistorySms] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
   const [smsTo, setSmsTo] = useState('');
@@ -83,8 +84,12 @@ export default function LeadsPage() {
     setHistoryLead(lead);
     setHistoryLoading(true);
     try {
-      const { data } = await callsApi.list({ lead_id: lead.id, per_page: 50 });
+      const [{ data }, smsRes] = await Promise.all([
+        callsApi.list({ lead_id: lead.id, per_page: 50 }),
+        lead.phone ? smsApi.getThread(lead.phone).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+      ]);
       setHistoryCalls(data || []);
+      setHistorySms((smsRes as any).data || []);
     } catch {
       setHistoryCalls([]);
     } finally {
@@ -430,11 +435,11 @@ export default function LeadsPage() {
             </div>
             {historyLoading ? (
               <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-            ) : historyCalls.length === 0 ? (
+            ) : historyCalls.length === 0 && historySms.length === 0 ? (
               <p className="text-sm text-muted-foreground py-8 text-center">No calls logged for this lead yet.</p>
             ) : (
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{historyCalls.length} calls</p>
+                {historyCalls.length > 0 && <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{historyCalls.length} calls</p>}
                 {historyCalls.map((c) => (
                   <div key={c.id} className="rounded-xl border border-black/5 dark:border-white/5 bg-surface px-3 py-2.5">
                     <div className="flex items-center justify-between gap-3">
@@ -454,6 +459,19 @@ export default function LeadsPage() {
                     )}
                   </div>
                 ))}
+                {historySms.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{historySms.length} texts</p>
+                    <div className="space-y-1.5">
+                      {historySms.map((m) => (
+                        <div key={m.id} className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${m.direction === 'outbound' ? 'ml-auto bg-foreground/10' : 'bg-surface border border-black/5 dark:border-white/5'}`}>
+                          <p className="whitespace-pre-wrap">{m.body}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">{new Date(m.created_at).toLocaleString()} · {m.status}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
