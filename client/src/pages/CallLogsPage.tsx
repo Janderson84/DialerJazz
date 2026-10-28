@@ -427,6 +427,13 @@ export default function CallLogsPage() {
                               {log.notes}
                             </span>
                           </div>
+                        ) : (log as any).transcription ? (
+                          <div className="flex items-start gap-2">
+                            <MessageSquare className="h-4 w-4 text-muted-foreground text-opacity-70 mt-0.5 shrink-0" />
+                            <span className="text-xs text-muted-foreground truncate block italic">
+                              "{(log as any).transcription}"
+                            </span>
+                          </div>
                         ) : (
                           <span className="text-muted-foreground text-opacity-50">-</span>
                         )}
