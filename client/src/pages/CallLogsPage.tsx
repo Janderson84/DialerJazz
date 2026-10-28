@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PhoneCall, Search, Loader2, Clock, User, Building2, MessageSquare, Play } from 'lucide-react';
 import Pagination from '@/components/ui/pagination';
@@ -54,6 +54,7 @@ const ITEMS_PER_PAGE = 25;
 export default function CallLogsPage() {
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [stats, setStats] = useState<{ total_calls: number; connected: number; connect_rate: number; dispositions: Record<string, number>; by_campaign?: { campaign_id: string; name: string; calls: number; human: number; rate: number }[] } | null>(null);
+  const [playingSid, setPlayingSid] = useState<string | null>(null);
   const [poolHealth, setPoolHealth] = useState<{ campaign_id: string; name: string; remaining_pct: number; remaining: number; total_leads: number }[] | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -340,7 +341,8 @@ export default function CallLogsPage() {
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {filteredLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-white/[0.02] transition-colors">
+                    <Fragment key={log.id}>
+                    <tr className="hover:bg-white/[0.02] transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-muted-foreground text-opacity-70" />
@@ -395,16 +397,14 @@ export default function CallLogsPage() {
                       </td>
                       <td className="px-6 py-4">
                         {log.recording_url && log.call_sid ? (
-                          <a
-                            href={`/api/calls/recording/${log.call_sid}?token=${encodeURIComponent(localStorage.getItem('jazz_access_token') || '')}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            title="Play recording (streams through the app — opens in a new tab)"
+                          <button
+                            onClick={() => setPlayingSid(playingSid === log.call_sid ? null : log.call_sid!)}
+                            title="Play recording inline"
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-400 text-xs font-medium hover:bg-indigo-500/25 transition-colors"
                           >
                             <Play className="h-3 w-3" />
-                            Play
-                          </a>
+                            {playingSid === log.call_sid ? 'Close' : 'Play'}
+                          </button>
                         ) : log.recording_url ? (
                           <a
                             href={log.recording_url}
@@ -432,6 +432,19 @@ export default function CallLogsPage() {
                         )}
                       </td>
                     </tr>
+                    {playingSid && playingSid === log.call_sid && (
+                      <tr>
+                        <td colSpan={9} className="px-6 py-2 bg-black/[0.02] dark:bg-white/[0.02]">
+                          <audio
+                            controls
+                            autoPlay
+                            className="w-full h-9"
+                            src={`/api/calls/recording/${log.call_sid}?token=${encodeURIComponent(localStorage.getItem('jazz_access_token') || '')}`}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
