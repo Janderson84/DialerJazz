@@ -464,6 +464,9 @@ export default function LeadsPage() {
                       </div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">{c.direction === 'inbound' ? 'in' : 'out'}</span>
                     </div>
+                    {c.transcription && (
+                      <p className="text-xs text-muted-foreground mt-2 line-clamp-3 italic">"{c.transcription}"</p>
+                    )}
                     {c.call_sid && c.recording_url && (
                       <audio
                         controls
