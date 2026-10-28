@@ -101,8 +101,38 @@ router.get('/team-pulse', async (req: AuthenticatedRequest, res: Response, next:
     };
 
     const perRep = new Map<string, { calls: number; connected: number; secs: number; appts: number }>();
+    const prevRep = new Map<string, { calls: number; connected: number }>();
     const CONNECTED = new Set(['answered', 'follow_up', 'not_interested', 'meeting_booked']);
+
+    // Previous-period window (same length, immediately before): for trend arrows.
+    const inPrevRange = (iso: string): boolean => {
+      if (!iso) return false;
+      const d = new Date(iso);
+      if (range === 'today') {
+        const y = new Date(Date.now() - 86400000);
+        return localDay(iso) === new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(y);
+      }
+      if (range === 'week') {
+        for (let i = 7; i < 14; i++) {
+          const day = new Date(Date.now() - i * 86400000);
+          if (localDay(iso) === new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(day)) return true;
+        }
+        return false;
+      }
+      // month: previous calendar month
+      const prevM = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit' }).format(new Date(Date.now() - 30 * 86400000));
+      const logM = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit' }).format(d);
+      return prevM === logM;
+    };
+
     for (const l of logs) {
+      if (inPrevRange(l.started_at)) {
+        const p = prevRep.get(l.user_id) || { calls: 0, connected: 0 };
+        p.calls += 1;
+        if (CONNECTED.has(l.disposition)) p.connected += 1;
+        prevRep.set(l.user_id, p);
+        continue;
+      }
       if (!inRange(l.started_at)) continue;
       const e = perRep.get(l.user_id) || { calls: 0, connected: 0, secs: 0, appts: 0 };
       e.calls += 1;
@@ -124,6 +154,7 @@ router.get('/team-pulse', async (req: AuthenticatedRequest, res: Response, next:
         talk_secs: e?.secs || 0,
         appointments: e?.appts || 0,
         overdue_callbacks: overdueByRep.get(String(m.rep_user_id)) || 0,
+        prev_connected: prevRep.get(String(m.rep_user_id))?.connected ?? null,
       });
     }
     // Master's own calls (not on the roster)
@@ -137,6 +168,7 @@ router.get('/team-pulse', async (req: AuthenticatedRequest, res: Response, next:
       talk_secs: masterEntry?.secs || 0,
       appointments: masterEntry?.appts || 0,
       overdue_callbacks: overdueByRep.get(String(req.user.id)) || 0,
+      prev_connected: prevRep.get(String(req.user.id))?.connected ?? null,
     });
 
     res.json({ data: out });

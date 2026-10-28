@@ -7,7 +7,7 @@ import CampaignsTable from '@/components/CampaignsTable';
 import { campaignsApi, settingsApi, statsApi, followupsApi, apiFetch, type Campaign, type FollowUp } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
-type TeamPulseRow = { rep_user_id: string; name: string; is_master: boolean; calls: number; connected: number; talk_secs: number; appointments?: number; overdue_callbacks?: number };
+type TeamPulseRow = { rep_user_id: string; name: string; is_master: boolean; calls: number; connected: number; talk_secs: number; appointments?: number; overdue_callbacks?: number; prev_connected?: number | null };
 
 import CreateCampaignModal from '@/components/CreateCampaignModal';
 
@@ -362,7 +362,15 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right shrink-0">
                   <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100">{r.calls} call{r.calls === 1 ? '' : 's'}</span>
-                  {r.connected > 0 && <p className="text-[11px] text-emerald-600 dark:text-emerald-400">{r.connected} connected</p>}
+                  <p className="text-[11px]">
+                    {r.connected > 0 && <span className="text-emerald-600 dark:text-emerald-400">{r.connected} connected</span>}
+                    {r.connected === 0 && <span className="text-muted-foreground">0 connected</span>}
+                    {r.prev_connected !== null && r.prev_connected !== undefined && (
+                      <span className={`ml-1 font-semibold ${r.connected > r.prev_connected ? 'text-emerald-500' : r.connected < r.prev_connected ? 'text-red-400' : 'text-muted-foreground'}`}>
+                        {r.connected > r.prev_connected ? '↑' : r.connected < r.prev_connected ? '↓' : '–'} {r.prev_connected}
+                      </span>
+                    )}
+                  </p>
                 </div>
               </div>
             ))}
