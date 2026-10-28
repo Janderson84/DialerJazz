@@ -4,6 +4,7 @@ import Pagination from '@/components/ui/pagination';
 import { NewMessageDialog } from './MessagesPage';
 import { usePagination } from '@/hooks/usePagination';
 import { toast } from 'sonner';
+import { useVoice } from '@/contexts/VoiceContext';
 import { leadsApi, callsApi, smsApi, type Lead } from '@/lib/api';
 import { displayCompany } from '@/lib/api';
 
@@ -54,6 +55,7 @@ export default function LeadsPage() {
 
   const { currentPage, totalPages, setCurrentPage, setMeta, perPage } =
     usePagination({ perPage: ITEMS_PER_PAGE });
+  const voice = useVoice();
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -429,7 +431,20 @@ export default function LeadsPage() {
               <div>
                 <h3 className="text-lg font-bold text-foreground">{[historyLead.first_name, historyLead.last_name].filter(Boolean).join(' ') || historyLead.company || 'Lead'}</h3>
                 <p className="text-sm text-muted-foreground">{historyLead.company || ''} {historyLead.state ? `· ${historyLead.state}` : ''}</p>
-                <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {historyLead.phone}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {historyLead.phone}</p>
+                  <button
+                    onClick={() => {
+                      voice.setActiveCallRoute('/leads');
+                      voice.dial(historyLead.phone);
+                      setHistoryLead(null);
+                      toast.info(`Dialing ${historyLead.phone}…`);
+                    }}
+                    className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500 text-[11px] font-semibold hover:bg-emerald-500/25 transition-colors"
+                  >
+                    Call now
+                  </button>
+                </div>
               </div>
               <button onClick={() => setHistoryLead(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
