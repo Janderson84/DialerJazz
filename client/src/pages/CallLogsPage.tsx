@@ -394,7 +394,18 @@ export default function CallLogsPage() {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        {log.recording_url ? (
+                        {log.recording_url && log.call_sid ? (
+                          <a
+                            href={`/api/calls/recording/${log.call_sid}?token=${encodeURIComponent(localStorage.getItem('jazz_access_token') || '')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Play recording (streams through the app — opens in a new tab)"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-400 text-xs font-medium hover:bg-indigo-500/25 transition-colors"
+                          >
+                            <Play className="h-3 w-3" />
+                            Play
+                          </a>
+                        ) : log.recording_url ? (
                           <a
                             href={log.recording_url}
                             target="_blank"

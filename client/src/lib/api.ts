@@ -283,7 +283,7 @@ export interface CallLog {
     company?: string;
     phone: string;
   } | null;
-  campaign: { name: string } | null;
+  campaign: { name: string } | null;  call_sid?: string | null;
 }
 
 export interface CallStats {
