@@ -112,6 +112,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onCreated }: Prop
   const [dialerMode, setDialerMode] = useState('preview');
   const [provider, setProvider] = useState<'telnyx' | 'twilio' | 'local'>('twilio');
   const [callerNumber, setCallerNumber] = useState('');
+  const [skipWrongHistory, setSkipWrongHistory] = useState(true);
 
   // CRM Import State
   const [crmLeads, setCrmLeads] = useState<Lead[]>([]);
@@ -399,7 +400,7 @@ export default function CreateCampaignModal({ isOpen, onClose, onCreated }: Prop
           }
 
           // 2. Submit to Bulk API
-          const bulkRes = await leadsApi.bulkUpload(newCampaignId, parsedLeads) as any;
+          const bulkRes = await leadsApi.bulkUpload(newCampaignId, parsedLeads, { skip_wrong_history: skipWrongHistory }) as any;
           
           setUploadProgress(100);
           const imported = bulkRes?.count ?? parsedLeads.length;
@@ -718,6 +719,15 @@ export default function CreateCampaignModal({ isOpen, onClose, onCreated }: Prop
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-black/30 p-4 rounded-xl border border-border space-y-4"
               >
+                <label className="flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={skipWrongHistory}
+                    onChange={(e) => setSkipWrongHistory(e.target.checked)}
+                    className="rounded border-white/20 bg-black/50 text-foreground focus:ring-foreground"
+                  />
+                  Auto-skip numbers that previously produced a wrong number
+                </label>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <FileSpreadsheet className="h-5 w-5 text-foreground" />

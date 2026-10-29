@@ -244,10 +244,10 @@ export const leadsApi = {
     return apiFetch<Lead[]>(`/leads/campaign/${campaignId}${qs ? `?${qs}` : ''}`);
   },
 
-  bulkUpload: (campaignId: string, leads: Omit<Lead, 'id' | 'campaign_id' | 'created_at'>[]) =>
+  bulkUpload: (campaignId: string, leads: Omit<Lead, 'id' | 'campaign_id' | 'created_at'>[], opts?: { skip_wrong_history?: boolean }) =>
     apiFetch<Lead[]>('/leads/bulk', {
       method: 'POST',
-      body: JSON.stringify({ campaign_id: campaignId, leads }),
+      body: JSON.stringify({ campaign_id: campaignId, leads, skip_wrong_history: opts?.skip_wrong_history || false }),
     }),
 
   updateDisposition: (leadId: string, status: string) =>

@@ -33,7 +33,9 @@ const leadSchema = z.object({
 
 const bulkLeadsSchema = z.object({
   campaign_id: z.string().uuid(),
-  leads: z.array(leadSchema).min(1).max(2000)
+  leads: z.array(leadSchema).min(1).max(2000),
+  // Drop rows whose number previously produced a wrong_number call.
+  skip_wrong_history: z.boolean().optional(),
 });
 
 // Mini-CRM: Fetch all leads globally for this user with server-side search/filter
@@ -148,6 +150,27 @@ router.post('/bulk', async (req: AuthenticatedRequest, res: Response, next: Next
   try {
     const body = bulkLeadsSchema.parse(req.body);
 
+    // Optional: pre-load numbers with a wrong_number past for auto-skip.
+    const badHistory = new Set<string>();
+    if (body.skip_wrong_history) {
+      try {
+        const adminPre = await adminFetch();
+        const badRes = await fetch(
+          `${adminPre.base}/api/database/records/call_logs?disposition=eq.wrong_number&select=to_number,from_number&limit=2000`,
+          { headers: adminPre.headers() }
+        );
+        if (badRes.ok) {
+          const payload: any = await badRes.json();
+          const all = (Array.isArray(payload) ? payload : payload?.data || []) as any[];
+          for (const r of all) {
+            for (const n of [r.to_number, r.from_number]) {
+              if (n && String(n).startsWith('+')) badHistory.add(String(n));
+            }
+          }
+        }
+      } catch { /* optional */ }
+    }
+
     // Validate rows individually: skip bad rows instead of failing the whole
     // batch (a single malformed phone in a 500-row CSV used to kill it all).
     const validLeads: z.infer<typeof leadSchema>[] = [];
@@ -166,6 +189,10 @@ router.post('/bulk', async (req: AuthenticatedRequest, res: Response, next: Next
       }
       if (seenPhones.has(phone)) {
         skipped.push({ index, reason: `duplicate phone in file` });
+        return;
+      }
+      if (badHistory.has(phone)) {
+        skipped.push({ index, reason: 'wrong number (previous call history)' });
         return;
       }
       seenPhones.add(phone);
