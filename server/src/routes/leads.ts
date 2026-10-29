@@ -260,13 +260,16 @@ router.get('/campaign/:campaignId', async (req: AuthenticatedRequest, res: Respo
     const { limit = '50', offset = '0' } = req.query;
 
     // Master (admin) can view any campaign's leads; reps only their own.
+    // DNC leads are EXCLUDED from the dialer feed — compliance: a lead the
+    // rep marked "Do Not Call" must never re-enter the queue.
     let clQuery = req.db!
       .database.from('campaign_leads')
       .select(`
         id,
-        leads (*)
+        leads!inner (*)
       `, { count: 'exact' })
-      .eq('campaign_id', req.params.campaignId);
+      .eq('campaign_id', req.params.campaignId)
+      .neq('leads.status', 'dnc');
     if (req.user.id !== MASTER_ID()) clQuery = clQuery.eq('user_id', req.user.id);
     const { data, count, error } = await clQuery
       .order('created_at', { ascending: true })
