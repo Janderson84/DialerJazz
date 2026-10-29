@@ -49,6 +49,7 @@ export default function LeadsPage() {
   const [historyLead, setHistoryLead] = useState<any | null>(null);
   const [historyCalls, setHistoryCalls] = useState<any[]>([]);
   const [historySms, setHistorySms] = useState<any[]>([]);
+  const [drawerNotes, setDrawerNotes] = useState('');
   const [historyLoading, setHistoryLoading] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
   const [smsTo, setSmsTo] = useState('');
@@ -88,6 +89,7 @@ export default function LeadsPage() {
 
   const openHistory = useCallback(async (lead: any) => {
     setHistoryLead(lead);
+    setDrawerNotes(lead.notes || '');
     setHistoryLoading(true);
     try {
       const [{ data }, smsRes] = await Promise.all([
@@ -450,6 +452,20 @@ export default function LeadsPage() {
               <div>
                 <h3 className="text-lg font-bold text-foreground">{[historyLead.first_name, historyLead.last_name].filter(Boolean).join(' ') || historyLead.company || 'Lead'}</h3>
                 <p className="text-sm text-muted-foreground">{historyLead.company || ''} {historyLead.state ? `· ${historyLead.state}` : ''}</p>
+                <textarea
+                  value={drawerNotes}
+                  onChange={(e) => setDrawerNotes(e.target.value)}
+                  onBlur={async () => {
+                    if (drawerNotes === (historyLead.notes || '')) return;
+                    try {
+                      await leadsApi.updateNotes(historyLead.id, drawerNotes);
+                      toast.success('Notes saved');
+                    } catch (e: any) { toast.error(e?.message || 'Failed to save notes'); }
+                  }}
+                  rows={2}
+                  placeholder="Notes about this lead…"
+                  className="mt-2 w-full bg-surface border border-black/5 dark:border-white/5 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-foreground/20 resize-y"
+                />
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-sm text-muted-foreground flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {historyLead.phone}</p>
                   <button

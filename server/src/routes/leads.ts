@@ -485,3 +485,22 @@ router.post('/purge-dead', requireAuth, async (req: AuthenticatedRequest, res: R
     next(error);
   }
 });
+
+// PATCH /api/leads/:id/notes — update a lead's notes.
+router.patch('/:id/notes', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const notesSchema = z.object({ notes: z.string().max(5000) });
+    const { notes } = notesSchema.parse(req.body);
+    let q = req.db!.database
+      .from('leads')
+      .update({ notes, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id);
+    if (req.user.id !== MASTER_ID()) q = q.eq('user_id', req.user.id);
+    const { data, error } = await q.select().single();
+    if (error) throw new ApiError(500, error.message, 'db_error');
+    if (!data) throw new ApiError(404, 'Lead not found', 'not_found');
+    res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+});
