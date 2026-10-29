@@ -6,7 +6,7 @@ import { usePagination } from '@/hooks/usePagination';
 import { toast } from 'sonner';
 import { useVoice } from '@/contexts/VoiceContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { leadsApi, callsApi, smsApi, type Lead } from '@/lib/api';
+import { leadsApi, callsApi, smsApi, followupsApi, type Lead } from '@/lib/api';
 import { displayCompany } from '@/lib/api';
 
 const ITEMS_PER_PAGE = 25;
@@ -50,6 +50,7 @@ export default function LeadsPage() {
   const [historyCalls, setHistoryCalls] = useState<any[]>([]);
   const [historySms, setHistorySms] = useState<any[]>([]);
   const [drawerNotes, setDrawerNotes] = useState('');
+  const [followUpDue, setFollowUpDue] = useState('');
   const [historyLoading, setHistoryLoading] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
   const [smsTo, setSmsTo] = useState('');
@@ -90,6 +91,7 @@ export default function LeadsPage() {
   const openHistory = useCallback(async (lead: any) => {
     setHistoryLead(lead);
     setDrawerNotes(lead.notes || '');
+    setFollowUpDue('');
     setHistoryLoading(true);
     try {
       const [{ data }, smsRes] = await Promise.all([
@@ -466,6 +468,27 @@ export default function LeadsPage() {
                   placeholder="Notes about this lead…"
                   className="mt-2 w-full bg-surface border border-black/5 dark:border-white/5 rounded-xl px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-foreground/20 resize-y"
                 />
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="datetime-local"
+                    value={followUpDue}
+                    onChange={(e) => setFollowUpDue(e.target.value)}
+                    className="flex-1 bg-surface border border-black/5 dark:border-white/5 rounded-xl px-3 py-1.5 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!followUpDue) return toast.error('Pick a date and time first');
+                      try {
+                        await followupsApi.create({ due_at: new Date(followUpDue).toISOString(), lead_id: historyLead.id, notes: 'Created from lead drawer' });
+                        toast.success('Follow-up scheduled');
+                        setFollowUpDue('');
+                      } catch (e: any) { toast.error(e?.message || 'Failed to schedule'); }
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-foreground text-background text-sm font-medium hover:opacity-90 transition-opacity shrink-0"
+                  >
+                    Set follow-up
+                  </button>
+                </div>
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-sm text-muted-foreground flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {historyLead.phone}</p>
                   <button
