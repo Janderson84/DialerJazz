@@ -7,7 +7,7 @@ import CampaignsTable from '@/components/CampaignsTable';
 import { campaignsApi, settingsApi, statsApi, followupsApi, apiFetch, type Campaign, type FollowUp } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
-type TeamPulseRow = { rep_user_id: string; name: string; is_master: boolean; calls: number; connected: number; talk_secs: number; appointments?: number; overdue_callbacks?: number; prev_connected?: number | null };
+type TeamPulseRow = { rep_user_id: string; name: string; is_master: boolean; calls: number; connected: number; talk_secs: number; appointments?: number; overdue_callbacks?: number; prev_connected?: number | null; wrong_numbers?: number };
 
 import CreateCampaignModal from '@/components/CreateCampaignModal';
 
@@ -369,6 +369,9 @@ export default function Dashboard() {
                       <span className={`ml-1 font-semibold ${r.connected > r.prev_connected ? 'text-emerald-500' : r.connected < r.prev_connected ? 'text-red-400' : 'text-muted-foreground'}`}>
                         {r.connected > r.prev_connected ? '↑' : r.connected < r.prev_connected ? '↓' : '–'} {r.prev_connected}
                       </span>
+                    )}
+                    {(r.wrong_numbers || 0) > 0 && (
+                      <span className="ml-2 text-amber-500">☎ {r.wrong_numbers} wrong #</span>
                     )}
                   </p>
                 </div>
