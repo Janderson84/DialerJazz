@@ -61,6 +61,31 @@ router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunct
       }
     } catch { /* annotation optional */ }
 
+    // Annotate last outbound call time per campaign (stale-list signal).
+    try {
+      const adminBase2 = process.env.INFORGE_URL || process.env.INSFORGE_URL || 'http://localhost:7130';
+      const adminUser2 = process.env.INSFORGE_ADMIN_USER || 'admin';
+      const adminPassword2 = process.env.INSFORGE_ADMIN_PASSWORD;
+      if (adminPassword2) {
+        const s3 = await fetch(`${adminBase2}/api/auth/admin/sessions`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: adminUser2, password: adminPassword2 }),
+        });
+        if (s3.ok) {
+          const { accessToken: at3 } = await s3.json();
+          const H3 = { Authorization: `Bearer ${at3}`, apikey: at3 };
+          const cl = await fetch(`${adminBase2}/api/database/records/call_logs?campaign_id=not.is.null&direction=eq.outbound&select=campaign_id,started_at&order=started_at.desc&limit=1000`, { headers: H3 }).then(r => r.json()).catch(() => null);
+          const lastByCamp = new Map<string, string>();
+          for (const c of (Array.isArray(cl) ? cl : cl?.data || []) as any[]) {
+            if (!lastByCamp.has(String(c.campaign_id))) lastByCamp.set(String(c.campaign_id), c.started_at);
+          }
+          for (const r of data || []) {
+            (r as any).last_call_at = lastByCamp.get(String((r as any).id)) || null;
+          }
+        }
+      }
+    } catch { /* annotation optional */ }
+
     res.json({
       data: data || [],
       meta: {

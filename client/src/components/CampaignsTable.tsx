@@ -158,6 +158,11 @@ export default function CampaignsTable({ campaigns }: CampaignsTableProps) {
                           {dryPools[campaign.id].remaining_pct}% left
                         </span>
                       )}
+                      {campaign.last_call_at && (
+                        <span className="block text-[10px] text-muted-foreground font-normal mt-0.5">
+                          last call {new Date(campaign.last_call_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </span>
+                      )}
                     </TableCell>
                   )}
                   {visibleColumns.includes("Owner") && (

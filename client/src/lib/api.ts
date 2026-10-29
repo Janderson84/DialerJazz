@@ -121,6 +121,7 @@ export interface Campaign {
   leads_called: number;
   auto_dial_delay_ms?: number;
   notes?: string | null;
+  last_call_at?: string | null;
   created_at: string;
   updated_at: string;
 }
