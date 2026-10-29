@@ -425,3 +425,36 @@ router.get('/export', requireAuth, async (req: AuthenticatedRequest & { user?: a
 });
 
 export default router;
+
+// POST /api/leads/purge-dead — master only. Removes leads with >= min
+// outbound attempts that ended no_answer/wrong_number (default 3) from ALL
+// campaigns (deletes campaign_leads junction rows; the lead record stays in
+// the CRM). List-hygiene: dead numbers shouldn't sit in queues.
+router.post('/purge-dead', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    if (req.user.id !== MASTER_ID()) throw new ApiError(403, 'Master only', 'forbidden');
+    const min = Math.max(1, Number(req.body?.min_attempts) || 3);
+
+    const admin = await adminFetch();
+    const clRes = await fetch(
+      `${admin.base}/api/database/records/call_logs?lead_id=not.is.null&disposition=in.(no_answer,wrong_number)&select=lead_id&limit=5000`,
+      { headers: admin.headers() }
+    );
+    if (!clRes.ok) throw new ApiError(500, 'Failed to load call logs', 'db_error');
+    const rows = ((await clRes.json()) || []) as any[];
+    const counts = new Map<string, number>();
+    for (const r of rows) counts.set(String(r.lead_id), (counts.get(String(r.lead_id)) || 0) + 1);
+    const dead = [...counts.entries()].filter(([, n]) => n >= min).map(([id]) => id);
+    if (!dead.length) return res.json({ data: { purged: 0 } });
+
+    const del = await fetch(
+      `${admin.base}/api/database/records/campaign_leads?lead_id=in.(${dead.join(',')})`,
+      { method: 'DELETE', headers: admin.headers() }
+    );
+    if (!del.ok) throw new ApiError(500, 'Failed to purge', 'db_error');
+
+    res.json({ data: { purged: dead.length, leads: dead } });
+  } catch (error) {
+    next(error);
+  }
+});

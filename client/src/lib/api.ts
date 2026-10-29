@@ -229,6 +229,12 @@ export const leadsApi = {
     return apiFetch<Lead[]>(qs ? `/leads?${qs}` : '/leads') as Promise<PaginatedResponse<Lead>>;
   },
 
+  purgeDead: (minAttempts = 3) =>
+    apiFetch<{ purged: number }>('/leads/purge-dead', {
+      method: 'POST',
+      body: JSON.stringify({ min_attempts: minAttempts }),
+    }),
+
   listByCampaign: (campaignId: string, params?: { status?: string; limit?: number; offset?: number }) => {
     const query = new URLSearchParams();
     if (params?.status) query.set('status', params.status);

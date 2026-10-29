@@ -5,6 +5,7 @@ import { NewMessageDialog } from './MessagesPage';
 import { usePagination } from '@/hooks/usePagination';
 import { toast } from 'sonner';
 import { useVoice } from '@/contexts/VoiceContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { leadsApi, callsApi, smsApi, type Lead } from '@/lib/api';
 import { displayCompany } from '@/lib/api';
 
@@ -56,6 +57,9 @@ export default function LeadsPage() {
   const { currentPage, totalPages, setCurrentPage, setMeta, perPage } =
     usePagination({ perPage: ITEMS_PER_PAGE });
   const voice = useVoice();
+  const { user } = useAuth();
+  const MASTER_ID = 'a4d41720-59e1-4850-8b15-e8841872e702';
+  const isMaster = user?.id === MASTER_ID;
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -175,6 +179,21 @@ export default function LeadsPage() {
         >
           <Filter className="h-4 w-4" />
           <span className="hidden sm:inline">Filters</span>
+          {isMaster && deadFilter && (
+            <button
+              onClick={async () => {
+                if (!confirm('Remove all leads dialed 3+ times (no-answer/wrong-number) from every campaign? The lead records stay in the CRM.')) return;
+                try {
+                  const { data } = await leadsApi.purgeDead(3);
+                  toast.success(`Removed ${data.purged} dead leads from all campaigns`);
+                  fetchLeads();
+                } catch (e: any) { toast.error(e?.message || 'Purge failed'); }
+              }}
+              className="px-3 py-1.5 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/30 hover:bg-red-500/20 transition-all"
+            >
+              Purge from campaigns
+            </button>
+          )}
           <button
             onClick={() => { setDeadFilter(v => !v); setCurrentPage(1); }}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
