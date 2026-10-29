@@ -442,12 +442,17 @@ export default function CallLogsPage() {
                     {playingSid && playingSid === log.call_sid && (
                       <tr>
                         <td colSpan={9} className="px-6 py-2 bg-black/[0.02] dark:bg-white/[0.02]">
-                          <audio
-                            controls
-                            autoPlay
-                            className="w-full h-9"
-                            src={`/api/calls/recording/${log.call_sid}?token=${encodeURIComponent(localStorage.getItem('jazz_access_token') || '')}`}
-                          />
+                          <div className="flex items-center gap-3">
+                            <audio
+                              controls
+                              autoPlay
+                              className="flex-1 h-9"
+                              src={`/api/calls/recording/${log.call_sid}?token=${encodeURIComponent(localStorage.getItem('jazz_access_token') || '')}`}
+                            />
+                            {(log as any).transcription && (
+                              <p className="max-w-md text-xs text-muted-foreground italic line-clamp-2">"{(log as any).transcription}"</p>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )}
