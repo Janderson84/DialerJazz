@@ -351,7 +351,12 @@ export default function Dashboard() {
                   </div>
                   <div className="min-w-0">
                     <h3 className="text-xs font-medium text-zinc-900 dark:text-zinc-100 truncate">{r.name}{r.is_master ? ' (you)' : ''}</h3>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">{r.talk_secs >= 60 ? `${Math.floor(r.talk_secs / 60)}m ${r.talk_secs % 60}s` : `${r.talk_secs}s`} talk time</p>
+                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                      {r.talk_secs >= 60 ? `${Math.floor(r.talk_secs / 60)}m ${r.talk_secs % 60}s` : `${r.talk_secs}s`} talk time
+                      {r.connected > 0 && r.talk_secs > 0 && (
+                        <span className="ml-1 text-zinc-400">· {Math.round(r.talk_secs / r.connected)}s/connect</span>
+                      )}
+                    </p>
                     {(r.appointments || 0) > 0 && (
                       <p className="text-[11px] text-emerald-500 font-semibold">📅 {r.appointments} appointment{(r.appointments || 0) > 1 ? 's' : ''}</p>
                     )}
