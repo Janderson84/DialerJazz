@@ -69,7 +69,7 @@ export default function CampaignDialerPage() {
   const [showSmsAfterCall, setShowSmsAfterCall] = useState(false);
   const [overdueCallbacks, setOverdueCallbacks] = useState<FollowUp[]>([]);
   const [campaignRate, setCampaignRate] = useState<{ calls: number; rate: number } | null>(null);
-  const sessionOutcomesRef = useRef<{ total: number; human: number; voicemail: number; no_answer: number }>({ total: 0, human: 0, voicemail: 0, no_answer: 0 });
+  const sessionOutcomesRef = useRef<{ total: number; human: number; voicemail: number; no_answer: number; secs: number }>({ total: 0, human: 0, voicemail: 0, no_answer: 0, secs: 0 });
   const recentlyDialedRef = useRef<Set<string>>(new Set());
   const [showSessionRecap, setShowSessionRecap] = useState(false);
   const [leadHistory, setLeadHistory] = useState<{ disposition: string | null; started_at: string; notes: string | null }[]>([]);
@@ -402,6 +402,7 @@ export default function CampaignDialerPage() {
       if (dispValue === 'answered' || dispValue === 'follow_up' || dispValue === 'appointment') sess.human += 1;
       else if (dispValue === 'voicemail') sess.voicemail += 1;
       else if (dispValue === 'no_answer' || dispValue === 'busy') sess.no_answer += 1;
+      sess.secs += voice.primaryCallDuration || 0;
       setShowDisposition(false);
 
       // Offer a post-call text before advancing. Dismissing the overlay ALWAYS
@@ -830,6 +831,16 @@ export default function CampaignDialerPage() {
                         ));
                       })()}
                     </div>
+                    {(() => {
+                      const sess = sessionOutcomesRef.current;
+                      if (!sess.secs) return null;
+                      return (
+                        <p className="text-center text-xs text-muted-foreground">
+                          {sess.secs >= 60 ? `${Math.floor(sess.secs / 60)}m ${sess.secs % 60}s` : `${sess.secs}s`} total talk
+                          {sess.human > 0 && <> · {Math.round(sess.secs / sess.human)}s per human connect</>}
+                        </p>
+                      );
+                    })()}
                     <button
                       onClick={() => setShowSessionRecap(false)}
                       className="w-full p-3 rounded-xl bg-foreground text-background text-sm font-bold"
