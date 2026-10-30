@@ -551,12 +551,26 @@ export default function LeadsPage() {
                       <p className="text-xs text-muted-foreground mt-2 line-clamp-3 italic">"{c.transcription}"</p>
                     )}
                     {c.call_sid && c.recording_url && (
-                      <audio
-                        controls
-                        preload="none"
-                        className="mt-2 w-full h-8"
-                        src={`/api/calls/recording/${c.call_sid}?token=${encodeURIComponent(localStorage.getItem('jazz_access_token') || '')}`}
-                      />
+                      <div className="mt-2 flex items-center gap-2">
+                        <audio
+                          controls
+                          preload="none"
+                          className="flex-1 h-8"
+                          src={`/api/calls/recording/${c.call_sid}?token=${encodeURIComponent(localStorage.getItem('jazz_access_token') || '')}`}
+                        />
+                        <button
+                          onClick={(e) => {
+                            const audio = (e.currentTarget.previousSibling as HTMLAudioElement);
+                            const next = audio.playbackRate === 1.5 ? 2 : audio.playbackRate === 2 ? 1 : 1.5;
+                            audio.playbackRate = next;
+                            e.currentTarget.textContent = `${next}×`;
+                          }}
+                          className="px-2 py-1 rounded-lg bg-black/5 dark:bg-white/10 text-xs font-semibold text-foreground hover:bg-black/10 dark:hover:bg-white/20 transition-colors shrink-0"
+                          title="Playback speed"
+                        >
+                          1×
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
