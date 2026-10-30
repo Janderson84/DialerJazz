@@ -51,6 +51,7 @@ export default function LeadsPage() {
   const [historySms, setHistorySms] = useState<any[]>([]);
   const [drawerNotes, setDrawerNotes] = useState('');
   const [followUpDue, setFollowUpDue] = useState('');
+  const [leadFollowUps, setLeadFollowUps] = useState<any[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [smsOpen, setSmsOpen] = useState(false);
   const [smsTo, setSmsTo] = useState('');
@@ -100,6 +101,9 @@ export default function LeadsPage() {
       ]);
       setHistoryCalls(data || []);
       setHistorySms((smsRes as any).data || []);
+      followupsApi.list('open').then(({ data: fus }) => {
+        setLeadFollowUps(((fus as any) || []).filter((f: any) => f.lead_id === lead.id));
+      }).catch(() => setLeadFollowUps([]));
     } catch {
       setHistoryCalls([]);
     } finally {
@@ -489,6 +493,15 @@ export default function LeadsPage() {
                     Set follow-up
                   </button>
                 </div>
+                {leadFollowUps.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {leadFollowUps.map((f) => (
+                      <div key={f.id} className="flex items-center gap-2 text-xs">
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-semibold">⏰ Follow-up {new Date(f.due_at).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-sm text-muted-foreground flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {historyLead.phone}</p>
                   <button
