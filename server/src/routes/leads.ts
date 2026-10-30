@@ -504,3 +504,23 @@ router.patch('/:id/notes', requireAuth, async (req: AuthenticatedRequest, res: R
     next(error);
   }
 });
+
+// GET /api/leads/by-phone/:phone — minimal lookup for manual-dial DNC guard.
+router.get('/by-phone/:phone', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const phone = String(req.params.phone || '').replace(/[^\d+]/g, '');
+    if (!/^\+?\d{10,15}$/.test(phone)) throw new ApiError(400, 'Invalid phone', 'bad_number');
+    const digits = phone.replace(/^\+/, '');
+    let q = req.db!.database
+      .from('leads')
+      .select('id,first_name,last_name,status')
+      .or(`phone.eq.+${digits},phone.eq.${digits}`)
+      .limit(1);
+    if (req.user.id !== MASTER_ID()) q = q.eq('user_id', req.user.id);
+    const { data, error } = await q;
+    if (error) throw new ApiError(500, error.message, 'db_error');
+    res.json({ data: data?.[0] || null });
+  } catch (error) {
+    next(error);
+  }
+});

@@ -4,6 +4,7 @@ import { Phone, Delete, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useVoice } from '@/contexts/VoiceContext';
+import { leadsApi } from '@/lib/api';
 import CallControls from '@/components/CallControls';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -64,7 +65,7 @@ export default function ManualDialerPage() {
     setSearchParams({}, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const handleDial = () => {
+  const handleDial = async () => {
     if (!voice.sipConfigured) {
       const realError = voice.error;
       if (realError) return toast.error(realError, { duration: 8000 });
@@ -72,6 +73,13 @@ export default function ManualDialerPage() {
     }
     if (voice.connectionStatus !== 'registered') return toast.error('Connecting...');
     if (numberInput.trim() === '') return toast.error('Please enter a phone number to call.');
+    try {
+      const { data: lead } = await leadsApi.byPhone(numberInput.trim());
+      if (lead?.status === 'dnc') {
+        toast.error(`${[lead.first_name, lead.last_name].filter(Boolean).join(' ') || 'This number'} is marked Do Not Call — dialing blocked.`);
+        return;
+      }
+    } catch { /* lookup failure must not block dialing */ }
     dialedNumberRef.current = numberInput.trim();
     voice.dial(numberInput.trim());
   };
