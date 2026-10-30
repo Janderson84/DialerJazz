@@ -69,7 +69,7 @@ export default function CampaignDialerPage() {
   const [showSmsAfterCall, setShowSmsAfterCall] = useState(false);
   const [overdueCallbacks, setOverdueCallbacks] = useState<FollowUp[]>([]);
   const [campaignRate, setCampaignRate] = useState<{ calls: number; rate: number } | null>(null);
-  const sessionOutcomesRef = useRef<{ total: number; human: number; voicemail: number; no_answer: number; secs: number }>({ total: 0, human: 0, voicemail: 0, no_answer: 0, secs: 0 });
+  const sessionOutcomesRef = useRef<{ total: number; human: number; voicemail: number; no_answer: number; secs: number; wrong: number }>({ total: 0, human: 0, voicemail: 0, no_answer: 0, secs: 0, wrong: 0 });
   const recentlyDialedRef = useRef<Set<string>>(new Set());
   const [showSessionRecap, setShowSessionRecap] = useState(false);
   const [leadHistory, setLeadHistory] = useState<{ disposition: string | null; started_at: string; notes: string | null }[]>([]);
@@ -402,6 +402,7 @@ export default function CampaignDialerPage() {
       if (dispValue === 'answered' || dispValue === 'follow_up' || dispValue === 'appointment') sess.human += 1;
       else if (dispValue === 'voicemail') sess.voicemail += 1;
       else if (dispValue === 'no_answer' || dispValue === 'busy') sess.no_answer += 1;
+      else if (dispValue === 'wrong_number') sess.wrong += 1;
       sess.secs += voice.primaryCallDuration || 0;
       setShowDisposition(false);
 
@@ -815,7 +816,7 @@ export default function CampaignDialerPage() {
                 <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
                   <div className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl space-y-4">
                     <h3 className="text-lg font-bold text-foreground text-center">Session recap</h3>
-                    <div className="grid grid-cols-4 gap-2 text-center">
+                    <div className="grid grid-cols-5 gap-2 text-center">
                       {(() => {
                         const sess = sessionOutcomesRef.current;
                         return [
@@ -823,6 +824,7 @@ export default function CampaignDialerPage() {
                           { label: 'Human', n: sess.human, c: 'text-emerald-500' },
                           { label: 'Voicemail', n: sess.voicemail, c: 'text-purple-400' },
                           { label: 'No answer', n: sess.no_answer, c: 'text-amber-500' },
+                          { label: 'Wrong #', n: sess.wrong, c: 'text-red-400' },
                         ].map((x) => (
                           <div key={x.label} className="p-3 rounded-xl bg-muted">
                             <div className={`text-2xl font-bold ${x.c}`}>{x.n}</div>
