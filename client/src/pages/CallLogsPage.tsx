@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PhoneCall, Search, Loader2, Clock, User, Building2, MessageSquare, Play } from 'lucide-react';
 import Pagination from '@/components/ui/pagination';
@@ -55,6 +55,8 @@ export default function CallLogsPage() {
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [stats, setStats] = useState<{ total_calls: number; connected: number; connect_rate: number; dispositions: Record<string, number>; by_campaign?: { campaign_id: string; name: string; calls: number; human: number; rate: number }[] } | null>(null);
   const [playingSid, setPlayingSid] = useState<string | null>(null);
+  const [speedTick, setSpeedTick] = useState(0);
+  const speedBySid = useRef<Record<string, number>>({});
   const [poolHealth, setPoolHealth] = useState<{ campaign_id: string; name: string; remaining_pct: number; remaining: number; total_leads: number }[] | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -444,11 +446,24 @@ export default function CallLogsPage() {
                         <td colSpan={9} className="px-6 py-2 bg-black/[0.02] dark:bg-white/[0.02]">
                           <div className="flex items-center gap-3">
                             <audio
+                              key={speedTick}
+                              ref={(el) => { if (el && speedBySid.current[log.call_sid!]) el.playbackRate = speedBySid.current[log.call_sid!]; }}
                               controls
                               autoPlay
                               className="flex-1 h-9"
                               src={`/api/calls/recording/${log.call_sid}?token=${encodeURIComponent(localStorage.getItem('jazz_access_token') || '')}`}
                             />
+                            <button
+                              onClick={() => {
+                                const next = speedBySid.current[log.call_sid!] === 1.5 ? 2 : speedBySid.current[log.call_sid!] === 2 ? 1 : 1.5;
+                                speedBySid.current[log.call_sid!] = next;
+                                setSpeedTick(t => t + 1);
+                              }}
+                              className="px-2 py-1 rounded-lg bg-black/5 dark:bg-white/10 text-xs font-semibold text-foreground hover:bg-black/10 dark:hover:bg-white/20 transition-colors shrink-0"
+                              title="Playback speed"
+                            >
+                              {speedBySid.current[log.call_sid!] ? `${speedBySid.current[log.call_sid!]}×` : '1×'}
+                            </button>
                             <div className="max-w-md min-w-0">
                               {log.notes && <p className="text-xs text-foreground truncate">{log.notes}</p>}
                               {(log as any).transcription && <p className="text-xs text-muted-foreground italic line-clamp-2">"{(log as any).transcription}"</p>}
