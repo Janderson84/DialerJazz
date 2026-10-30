@@ -498,6 +498,18 @@ export default function LeadsPage() {
                     {leadFollowUps.map((f) => (
                       <div key={f.id} className="flex items-center gap-2 text-xs">
                         <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 font-semibold">⏰ Follow-up {new Date(f.due_at).toLocaleString()}</span>
+                        <button
+                          onClick={async () => {
+                            try {
+                              await followupsApi.update(f.id, { status: 'done' });
+                              setLeadFollowUps(leadFollowUps.filter((x) => x.id !== f.id));
+                              toast.success('Follow-up completed');
+                            } catch (e: any) { toast.error(e?.message || 'Failed'); }
+                          }}
+                          className="text-muted-foreground hover:text-emerald-500 underline"
+                        >
+                          done
+                        </button>
                       </div>
                     ))}
                   </div>
