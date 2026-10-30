@@ -449,9 +449,10 @@ export default function CallLogsPage() {
                               className="flex-1 h-9"
                               src={`/api/calls/recording/${log.call_sid}?token=${encodeURIComponent(localStorage.getItem('jazz_access_token') || '')}`}
                             />
-                            {(log as any).transcription && (
-                              <p className="max-w-md text-xs text-muted-foreground italic line-clamp-2">"{(log as any).transcription}"</p>
-                            )}
+                            <div className="max-w-md min-w-0">
+                              {log.notes && <p className="text-xs text-foreground truncate">{log.notes}</p>}
+                              {(log as any).transcription && <p className="text-xs text-muted-foreground italic line-clamp-2">"{(log as any).transcription}"</p>}
+                            </div>
                           </div>
                         </td>
                       </tr>
