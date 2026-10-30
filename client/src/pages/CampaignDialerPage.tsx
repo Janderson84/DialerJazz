@@ -291,6 +291,13 @@ export default function CampaignDialerPage() {
   const handleDialForLead = (lead: Lead | undefined) => {
     if (!lead) return;
 
+    // Defense in depth: DNC leads are already excluded server-side, but if
+    // one ever reaches the client, refuse to dial it.
+    if (lead.status === 'dnc') {
+      toast.error('This lead is marked Do Not Call — dialing blocked.');
+      return;
+    }
+
     // Local SIM: use tel: URI, skip WebRTC entirely
     if (campaign?.provider === 'local') {
       localCall(lead.phone);
