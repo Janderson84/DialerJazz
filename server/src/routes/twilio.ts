@@ -148,6 +148,32 @@ router.post('/voice', express.urlencoded({ extended: false }), async (req: Reque
       const outboundCallerId = repLine || from;
       console.log(`[Twilio Voice Webhook] outbound callerId=${outboundCallerId} (rep=${repId || 'master'}, repLine=${repLine || 'none'})`);
       const clean = to.replace(/[^\d+]/g, '');
+
+      // Final DNC gate — server-side, independent of any client guard.
+      // If the destination matches a lead marked Do Not Call, refuse the
+      // leg entirely with <Reject/>.
+      try {
+        const adminDnc = await adminFetch();
+        const digitsOnly = clean.replace(/^\+/, '');
+        const dncRes = await fetch(
+          `${adminDnc.base}/api/database/records/leads?or=(phone.eq.+${digitsOnly},phone.eq.${digitsOnly})&status=eq.dnc&select=id&limit=1`,
+          { headers: adminDnc.headers() }
+        );
+        if (dncRes.ok) {
+          const dncPayload: any = await dncRes.json();
+          const dncRows = (Array.isArray(dncPayload) ? dncPayload : dncPayload?.data || []) as any[];
+          if (dncRows.length > 0) {
+            console.warn(`[Twilio Voice Webhook] DNC block: refusing outbound call to ${clean} (lead marked Do Not Call)`);
+            twiml.reject();
+            res.type('text/xml').send(twiml.toString());
+            return;
+          }
+        }
+      } catch (dncErr: any) {
+        // Lookup failure should not hard-block dialing; log and continue.
+        console.error('[Twilio Voice Webhook] DNC lookup failed (allowing call):', dncErr?.message);
+      }
+
       const amd = twiml.dial({
         callerId: outboundCallerId,
         machineDetection: 'DetectMessageEnd',
