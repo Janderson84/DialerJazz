@@ -524,3 +524,28 @@ router.get('/by-phone/:phone', requireAuth, async (req: AuthenticatedRequest, re
     next(error);
   }
 });
+
+// PATCH /api/leads/:id/details — update basic lead fields (name/company).
+router.patch('/:id/details', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    const detailsSchema = z.object({
+      first_name: z.string().max(100).optional(),
+      last_name: z.string().max(100).optional(),
+      company: z.string().max(200).optional(),
+      email: z.string().max(200).optional(),
+    });
+    const body = detailsSchema.parse(req.body);
+    if (!Object.keys(body).length) throw new ApiError(400, 'No fields to update', 'bad_request');
+    let q = req.db!.database
+      .from('leads')
+      .update({ ...body, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id);
+    if (req.user.id !== MASTER_ID()) q = q.eq('user_id', req.user.id);
+    const { data, error } = await q.select().single();
+    if (error) throw new ApiError(500, error.message, 'db_error');
+    if (!data) throw new ApiError(404, 'Lead not found', 'not_found');
+    res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+});

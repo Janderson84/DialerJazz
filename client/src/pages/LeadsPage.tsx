@@ -457,7 +457,24 @@ export default function LeadsPage() {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg font-bold text-foreground">{[historyLead.first_name, historyLead.last_name].filter(Boolean).join(' ') || historyLead.company || 'Lead'}</h3>
+                  <input
+                    defaultValue={[historyLead.first_name, historyLead.last_name].filter(Boolean).join(' ') || ''}
+                    placeholder="Name"
+                    onBlur={async (e) => {
+                      const full = e.target.value.trim();
+                      const [first, ...rest] = full.split(/\s+/);
+                      const patch: any = { first_name: first || '' };
+                      if (rest.length) patch.last_name = rest.join(' ');
+                      if (full === [historyLead.first_name, historyLead.last_name].filter(Boolean).join(' ')) return;
+                      try {
+                        const { data } = await leadsApi.updateDetails(historyLead.id, patch);
+                        setHistoryLead({ ...historyLead, ...data });
+                        toast.success('Lead updated');
+                        fetchLeads();
+                      } catch (err: any) { toast.error(err?.message || 'Failed to update'); }
+                    }}
+                    className="text-lg font-bold text-foreground bg-transparent border-b border-transparent hover:border-border focus:border-foreground/40 focus:outline-none w-full"
+                  />
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${historyLead.status === 'dnc' ? 'bg-red-500/15 text-red-400' : 'bg-muted text-muted-foreground'}`}>
                     {historyLead.status?.replace('_', ' ') || 'new'}
                   </span>

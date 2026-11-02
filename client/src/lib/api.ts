@@ -250,6 +250,12 @@ export const leadsApi = {
       body: JSON.stringify({ campaign_id: campaignId, leads, skip_wrong_history: opts?.skip_wrong_history || false }),
     }),
 
+  updateDetails: (leadId: string, patch: { first_name?: string; last_name?: string; company?: string; email?: string }) =>
+    apiFetch<Lead>(`/leads/${leadId}/details`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+
   byPhone: (phone: string) =>
     apiFetch<Lead | null>(`/leads/by-phone/${encodeURIComponent(phone)}`),
 
