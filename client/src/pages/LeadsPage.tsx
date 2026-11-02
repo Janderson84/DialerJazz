@@ -456,7 +456,25 @@ export default function LeadsPage() {
           <div className="relative bg-background border-l border-black/5 dark:border-white/5 w-full max-w-md h-full overflow-auto p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h3 className="text-lg font-bold text-foreground">{[historyLead.first_name, historyLead.last_name].filter(Boolean).join(' ') || historyLead.company || 'Lead'}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-foreground">{[historyLead.first_name, historyLead.last_name].filter(Boolean).join(' ') || historyLead.company || 'Lead'}</h3>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${historyLead.status === 'dnc' ? 'bg-red-500/15 text-red-400' : 'bg-muted text-muted-foreground'}`}>
+                    {historyLead.status?.replace('_', ' ') || 'new'}
+                  </span>
+                  <button
+                    onClick={async () => {
+                      const next = historyLead.status === 'dnc' ? 'no_answer' : 'dnc';
+                      try {
+                        await leadsApi.updateDisposition(historyLead.id, next);
+                        setHistoryLead({ ...historyLead, status: next });
+                        toast.success(next === 'dnc' ? 'Marked Do Not Call — removed from dial queues' : 'DNC removed');
+                      } catch (e: any) { toast.error(e?.message || 'Failed to update'); }
+                    }}
+                    className="text-[11px] underline text-muted-foreground hover:text-foreground"
+                  >
+                    {historyLead.status === 'dnc' ? 'remove DNC' : 'mark DNC'}
+                  </button>
+                </div>
                 <p className="text-sm text-muted-foreground">{historyLead.company || ''} {historyLead.state ? `· ${historyLead.state}` : ''}</p>
                 <textarea
                   value={drawerNotes}
