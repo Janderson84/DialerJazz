@@ -492,7 +492,24 @@ export default function LeadsPage() {
                     {historyLead.status === 'dnc' ? 'remove DNC' : 'mark DNC'}
                   </button>
                 </div>
-                <p className="text-sm text-muted-foreground">{historyLead.company || ''} {historyLead.state ? `· ${historyLead.state}` : ''}</p>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    defaultValue={historyLead.company || ''}
+                    placeholder="Company"
+                    onBlur={async (e) => {
+                      const v = e.target.value.trim();
+                      if (v === (historyLead.company || '')) return;
+                      try {
+                        const { data } = await leadsApi.updateDetails(historyLead.id, { company: v });
+                        setHistoryLead({ ...historyLead, ...data });
+                        toast.success('Company updated');
+                        fetchLeads();
+                      } catch (err: any) { toast.error(err?.message || 'Failed to update'); }
+                    }}
+                    className="text-sm text-muted-foreground bg-transparent border-b border-transparent hover:border-border focus:border-foreground/40 focus:outline-none w-40"
+                  />
+                  {historyLead.state && <span className="text-sm text-muted-foreground">· {historyLead.state}</span>}
+                </div>
                 <textarea
                   value={drawerNotes}
                   onChange={(e) => setDrawerNotes(e.target.value)}
