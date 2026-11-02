@@ -441,14 +441,28 @@ export default function CallLogsPage() {
                               {log.notes}
                             </span>
                           </div>
-                        ) : (log as any).transcription ? (
-                          <div className="flex items-start gap-2">
-                            <MessageSquare className="h-4 w-4 text-muted-foreground text-opacity-70 mt-0.5 shrink-0" />
-                            <span className="text-xs text-muted-foreground truncate block italic">
-                              "{(log as any).transcription}"
-                            </span>
-                          </div>
-                        ) : (
+                        ) : (log as any).transcription ? (() => {
+                          const term = searchTerm.trim();
+                          const text = (log as any).transcription as string;
+                          let inner: React.ReactNode = text;
+                          if (term.length > 2 && text.toLowerCase().includes(term.toLowerCase())) {
+                            const idx = text.toLowerCase().indexOf(term.toLowerCase());
+                            const start = Math.max(0, idx - 40);
+                            const snippet = (start > 0 ? '…' : '') + text.slice(start, idx + term.length + 40) + (idx + term.length + 40 < text.length ? '…' : '');
+                            const parts = snippet.split(new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'i'));
+                            inner = parts.map((part, i) =>
+                              part.toLowerCase() === term.toLowerCase()
+                                ? <mark key={i} className="bg-amber-500/30 text-foreground rounded px-0.5">{part}</mark>
+                                : <span key={i}>{part}</span>
+                            );
+                          }
+                          return (
+                            <div className="flex items-start gap-2">
+                              <MessageSquare className="h-4 w-4 text-muted-foreground text-opacity-70 mt-0.5 shrink-0" />
+                              <span className="text-xs text-muted-foreground truncate block italic">"{inner}"</span>
+                            </div>
+                          );
+                        })() : (
                           <span className="text-muted-foreground text-opacity-50">-</span>
                         )}
                       </td>
