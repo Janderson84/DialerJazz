@@ -376,7 +376,13 @@ export default function Dashboard() {
                       </span>
                     )}
                     {(r.wrong_numbers || 0) > 0 && (
-                      <span className="ml-2 text-amber-500">☎ {r.wrong_numbers} wrong #</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/call-logs?rep=${r.rep_user_id}&disposition=wrong_number`); }}
+                        className="ml-2 text-amber-500 underline decoration-dotted hover:text-amber-400"
+                        title="Show this rep's wrong-number calls"
+                      >
+                        ☎ {r.wrong_numbers} wrong #
+                      </button>
                     )}
                   </p>
                 </div>
