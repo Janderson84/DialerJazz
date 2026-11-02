@@ -565,9 +565,26 @@ export default function LeadsPage() {
                       </div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">{c.direction === 'inbound' ? 'in' : 'out'}</span>
                     </div>
-                    {c.transcription && (
-                      <p className="text-xs text-muted-foreground mt-2 line-clamp-3 italic">"{c.transcription}"</p>
-                    )}
+                    {c.transcription && (() => {
+                      const term = debouncedSearch.trim();
+                      const text = c.transcription;
+                      if (term.length > 2 && text.toLowerCase().includes(term.toLowerCase())) {
+                        const idx = text.toLowerCase().indexOf(term.toLowerCase());
+                        const start = Math.max(0, idx - 60);
+                        const snippet = (start > 0 ? '…' : '') + text.slice(start, idx + term.length + 60) + (idx + term.length + 60 < text.length ? '…' : '');
+                        const parts = snippet.split(new RegExp(`(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'i'));
+                        return (
+                          <p className="text-xs mt-2 line-clamp-3 italic">
+                            "{parts.map((part, i) =>
+                              part.toLowerCase() === term.toLowerCase()
+                                ? <mark key={i} className="bg-amber-500/30 text-foreground rounded px-0.5">{part}</mark>
+                                : <span key={i} className="text-muted-foreground">{part}</span>
+                            )}"
+                          </p>
+                        );
+                      }
+                      return <p className="text-xs text-muted-foreground mt-2 line-clamp-3 italic">"{text}"</p>;
+                    })()}
                     {c.call_sid && c.recording_url && (
                       <div className="mt-2 flex items-center gap-2">
                         <audio
