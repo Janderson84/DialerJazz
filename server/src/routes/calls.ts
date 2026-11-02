@@ -211,7 +211,7 @@ router.post('/log', requireAuth, async (req: AuthenticatedRequest, res, next) =>
 router.get('/', requireAuth, async (req: AuthenticatedRequest, res, next) => {
   try {
     const userId = req.user!.id;
-    const { campaign_id, lead_id, rep } = req.query;
+    const { campaign_id, lead_id, rep, disposition } = req.query;
     const q = String(req.query.q || '').trim();
     const page = Math.max(1, Number(req.query.page) || 1);
     const perPage = Math.min(100, Math.max(1, Number(req.query.per_page) || 25));
@@ -308,6 +308,10 @@ router.get('/', requireAuth, async (req: AuthenticatedRequest, res, next) => {
     const transcriptIds = (req as any)._transcriptIds as string[] | undefined;
     if (transcriptIds) {
       query = query.in('id', transcriptIds);
+    }
+    // Disposition filter (e.g. ?disposition=wrong_number for drill-downs).
+    if (typeof disposition === 'string' && disposition.trim()) {
+      query = query.eq('disposition', disposition.trim());
     }
     // Date range (inclusive), compared against the call start timestamp.
     // Dates are interpreted in the team's local timezone (America/Vancouver),
@@ -424,11 +428,12 @@ router.get('/outcomes', requireAuth, async (req: AuthenticatedRequest, res, next
   try {
     const userId = req.user!.id;
     const isMaster = userId === MASTER_ID();
-    const { campaign_id, rep, from, to } = req.query;
+    const { campaign_id, rep, from, to, disposition } = req.query;
 
     const admin = await adminFetch();
     const filters: string[] = ['direction=eq.outbound'];
     if (campaign_id) filters.push(`campaign_id=eq.${encodeURIComponent(String(campaign_id))}`);
+    if (disposition) filters.push(`disposition=eq.${encodeURIComponent(String(disposition))}`);
     if (!isMaster) filters.push(`user_id=eq.${userId}`);
     else if (rep) filters.push(`user_id=eq.${encodeURIComponent(String(rep))}`);
     if (from) filters.push(`started_at=gte.${encodeURIComponent(new Date(String(from) + 'T00:00:00').toISOString())}`);

@@ -64,6 +64,7 @@ export default function CallLogsPage() {
   const [selectedCampaign, setSelectedCampaign] = useState<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedRep, setSelectedRep] = useState<string>(() => searchParams.get('rep') || '');
+  const [dispositionFilter, setDispositionFilter] = useState<string>(() => searchParams.get('disposition') || '');
   const [fromDate, setFromDate] = useState<string>('');
   const [toDate, setToDate] = useState<string>('');
   const [roster, setRoster] = useState<{ rep_user_id: string; display_name: string }[]>([]);
@@ -89,6 +90,7 @@ export default function CallLogsPage() {
         callsStatsApi.get({
           campaign_id: selectedCampaign || undefined,
           rep: isMaster ? (selectedRep || undefined) : undefined,
+          disposition: dispositionFilter || undefined,
           from: fromDate || undefined,
           to: toDate || undefined,
         }).catch(() => null),
@@ -98,6 +100,7 @@ export default function CallLogsPage() {
           from: fromDate || undefined,
           to: toDate || undefined,
           q: searchTerm || undefined,
+          disposition: dispositionFilter || undefined,
           page: currentPage,
           per_page: perPage,
         }),
@@ -115,7 +118,7 @@ export default function CallLogsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCampaign, selectedRep, fromDate, toDate, searchTerm, isMaster, currentPage, perPage, setMeta]);
+  }, [selectedCampaign, selectedRep, dispositionFilter, fromDate, toDate, searchTerm, isMaster, currentPage, perPage, setMeta]);
 
   // Keep ?rep= in the URL in sync with the filter (deep-linkable from Team Pulse)
   useEffect(() => {
@@ -123,6 +126,7 @@ export default function CallLogsPage() {
     if (selectedRep !== current) {
       const next = new URLSearchParams(searchParams);
       if (selectedRep) next.set('rep', selectedRep); else next.delete('rep');
+    if (dispositionFilter) next.set('disposition', dispositionFilter); else next.delete('disposition');
       setSearchParams(next, { replace: true });
     }
   }, [selectedRep, searchParams, setSearchParams]);
@@ -211,6 +215,14 @@ export default function CallLogsPage() {
               className="px-3 py-2.5 rounded-[0.85rem] text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               Clear
+            </button>
+          )}{" "}
+          {dispositionFilter && (
+            <button
+              onClick={() => setDispositionFilter('')}
+              className="px-3 py-1.5 rounded-full text-xs font-medium bg-indigo-500/15 text-indigo-400 hover:bg-indigo-500/25 transition-colors"
+            >
+              {dispositionFilter.replace('_', ' ')} ✕
             </button>
           )}
         </div>

@@ -311,12 +311,13 @@ export interface CallStats {
 }
 
 export const callsStatsApi = {
-  get: (params: { campaign_id?: string; rep?: string; from?: string; to?: string }) => {
+  get: (params: { campaign_id?: string; rep?: string; from?: string; to?: string; disposition?: string }) => {
     const q = new URLSearchParams();
     if (params.campaign_id) q.set('campaign_id', params.campaign_id);
     if (params.rep) q.set('rep', params.rep);
     if (params.from) q.set('from', params.from);
     if (params.to) q.set('to', params.to);
+    if (params.disposition) q.set('disposition', params.disposition);
     return apiFetch<{ data: { total_calls: number; connected: number; connect_rate: number; dispositions: Record<string, number>; by_campaign?: { campaign_id: string; name: string; calls: number; human: number; rate: number }[] } }>(`/calls/outcomes?${q.toString()}`);
   },
 };
@@ -328,7 +329,7 @@ export const callsApi = {
       body: JSON.stringify(payload),
     }),
 
-  list: (params?: { campaign_id?: string; lead_id?: string; rep?: string; from?: string; to?: string; q?: string } & PaginationParams) => {
+  list: (params?: { campaign_id?: string; lead_id?: string; rep?: string; from?: string; to?: string; q?: string; disposition?: string } & PaginationParams) => {
     const query = new URLSearchParams();
     if (params?.campaign_id) query.set('campaign_id', params.campaign_id);
     if (params?.lead_id) query.set('lead_id', params.lead_id);
@@ -336,6 +337,7 @@ export const callsApi = {
     if (params?.from) query.set('from', params.from);
     if (params?.to) query.set('to', params.to);
     if (params?.q) query.set('q', params.q);
+    if (params?.disposition) query.set('disposition', params.disposition);
     if (params?.page) query.set('page', String(params.page));
     if (params?.per_page) query.set('per_page', String(params.per_page));
     const qs = query.toString();
