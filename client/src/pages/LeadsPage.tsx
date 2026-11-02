@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Users as UsersIcon, Search, Loader2, Filter, X, Globe, MapPin, Star, Tag as TagIcon, MessageSquare, Phone } from 'lucide-react';
+import { Users as UsersIcon, Search, Loader2, Filter, X, Globe, MapPin, Star, Tag as TagIcon, MessageSquare, Phone, Mail } from 'lucide-react';
 import Pagination from '@/components/ui/pagination';
 import { NewMessageDialog } from './MessagesPage';
 import { usePagination } from '@/hooks/usePagination';
@@ -566,6 +566,24 @@ export default function LeadsPage() {
                     ))}
                   </div>
                 )}
+                <div className="flex items-center gap-2 mt-1">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <input
+                    defaultValue={historyLead.email || ''}
+                    placeholder="Email"
+                    onBlur={async (e) => {
+                      const v = e.target.value.trim();
+                      if (v === (historyLead.email || '')) return;
+                      try {
+                        const { data } = await leadsApi.updateDetails(historyLead.id, { email: v });
+                        setHistoryLead({ ...historyLead, ...data });
+                        toast.success('Email updated');
+                        fetchLeads();
+                      } catch (err: any) { toast.error(err?.message || 'Failed to update'); }
+                    }}
+                    className="text-sm text-muted-foreground bg-transparent border-b border-transparent hover:border-border focus:border-foreground/40 focus:outline-none flex-1 min-w-0"
+                  />
+                </div>
                 <div className="flex items-center gap-2 mt-1">
                   <p className="text-sm text-muted-foreground flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {historyLead.phone}</p>
                   <button
