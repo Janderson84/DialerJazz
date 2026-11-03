@@ -612,7 +612,7 @@ export default function LeadsPage() {
               <p className="text-sm text-muted-foreground py-8 text-center">No calls logged for this lead yet.</p>
             ) : (
               <div className="space-y-2">
-                {historyCalls.length > 0 && <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{historyCalls.length} calls</p>}
+                {historyCalls.length > 0 && <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{historyCalls.length} calls{historyCalls.filter(c => c.recording_url).length > 0 && ` · ${historyCalls.filter(c => c.recording_url).length} recorded`}</p>}
                 {historyCalls.map((c) => (
                   <div key={c.id} className="rounded-xl border border-black/5 dark:border-white/5 bg-surface px-3 py-2.5">
                     <div className="flex items-center justify-between gap-3">
