@@ -358,7 +358,13 @@ export default function Dashboard() {
                       )}
                     </p>
                     {(r.appointments || 0) > 0 && (
-                      <p className="text-[11px] text-emerald-500 font-semibold">📅 {r.appointments} appointment{(r.appointments || 0) > 1 ? 's' : ''}</p>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/call-logs?rep=${r.rep_user_id}&disposition=appointment`); }}
+                        className="text-[11px] text-emerald-500 font-semibold underline decoration-dotted hover:text-emerald-400"
+                        title="Show this rep's appointment calls"
+                      >
+                        📅 {r.appointments} appointment{(r.appointments || 0) > 1 ? 's' : ''}
+                      </button>
                     )}
                     {(r.overdue_callbacks || 0) > 0 && (
                       <p className="text-[11px] text-amber-500 font-semibold">⏰ {r.overdue_callbacks} callback{(r.overdue_callbacks || 0) > 1 ? 's' : ''} overdue</p>
