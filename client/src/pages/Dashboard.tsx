@@ -367,7 +367,13 @@ export default function Dashboard() {
                       </button>
                     )}
                     {(r.overdue_callbacks || 0) > 0 && (
-                      <p className="text-[11px] text-amber-500 font-semibold">⏰ {r.overdue_callbacks} callback{(r.overdue_callbacks || 0) > 1 ? 's' : ''} overdue</p>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate('/leads?status=follow_up'); }}
+                        className="text-[11px] text-amber-500 font-semibold underline decoration-dotted hover:text-amber-400"
+                        title="Show leads awaiting callbacks"
+                      >
+                        ⏰ {r.overdue_callbacks} callback{(r.overdue_callbacks || 0) > 1 ? 's' : ''} overdue
+                      </button>
                     )}
                   </div>
                 </div>

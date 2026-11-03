@@ -44,7 +44,7 @@ export default function LeadsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>(() => new URLSearchParams(window.location.search).get('status') || '');
   const [deadFilter, setDeadFilter] = useState(false);
   const [historyLead, setHistoryLead] = useState<any | null>(null);
   const [historyCalls, setHistoryCalls] = useState<any[]>([]);
