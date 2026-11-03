@@ -833,7 +833,17 @@ export default function CampaignDialerPage() {
                           { label: 'No answer', n: sess.no_answer, c: 'text-amber-500' },
                           { label: 'Wrong #', n: sess.wrong, c: 'text-red-400' },
                         ].map((x) => (
-                          <div key={x.label} className="p-3 rounded-xl bg-muted">
+                          <div
+                            key={x.label}
+                            className={`p-3 rounded-xl bg-muted ${x.label === 'Wrong #' && x.n > 0 ? 'cursor-pointer hover:bg-muted/70' : ''}`}
+                            onClick={() => {
+                              if (x.label === 'Wrong #' && x.n > 0) {
+                                setShowSessionRecap(false);
+                                navigate(`/call-logs?disposition=wrong_number&from=${new Date().toISOString().slice(0, 10)}`);
+                              }
+                            }}
+                            title={x.label === 'Wrong #' && x.n > 0 ? 'Review these calls' : undefined}
+                          >
                             <div className={`text-2xl font-bold ${x.c}`}>{x.n}</div>
                             <div className="text-[11px] text-muted-foreground">{x.label}</div>
                           </div>
