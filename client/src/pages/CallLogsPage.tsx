@@ -55,6 +55,7 @@ export default function CallLogsPage() {
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   const [stats, setStats] = useState<{ total_calls: number; connected: number; connect_rate: number; dispositions: Record<string, number>; by_campaign?: { campaign_id: string; name: string; calls: number; human: number; rate: number }[] } | null>(null);
   const [playingSid, setPlayingSid] = useState<string | null>(null);
+  const [focusedIdx, setFocusedIdx] = useState(-1);
   const [speedTick, setSpeedTick] = useState(0);
   const speedBySid = useRef<Record<string, number>>({});
   const [poolHealth, setPoolHealth] = useState<{ campaign_id: string; name: string; remaining_pct: number; remaining: number; total_leads: number }[] | null>(null);
@@ -120,6 +121,7 @@ export default function CallLogsPage() {
     }
   }, [selectedCampaign, selectedRep, dispositionFilter, fromDate, toDate, searchTerm, isMaster, currentPage, perPage, setMeta]);
 
+
   // Keep ?rep= in the URL in sync with the filter (deep-linkable from Team Pulse)
   useEffect(() => {
     const current = searchParams.get('rep') || '';
@@ -149,6 +151,27 @@ export default function CallLogsPage() {
     }),
     [callLogs, searchTerm]
   );
+
+  // j/k keyboard navigation between call rows (Enter toggles the player)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (!filteredLogs.length) return;
+      if (e.key === 'j' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        setFocusedIdx(i => Math.min(i + 1, filteredLogs.length - 1));
+      } else if (e.key === 'k' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setFocusedIdx(i => Math.max(i - 1, 0));
+      } else if (e.key === 'Enter' && focusedIdx >= 0 && focusedIdx < filteredLogs.length) {
+        const sid = filteredLogs[focusedIdx]?.call_sid;
+        if (sid) setPlayingSid(playingSid === sid ? null : sid);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [filteredLogs, focusedIdx, playingSid]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -356,7 +379,7 @@ export default function CallLogsPage() {
                 <tbody className="divide-y divide-white/5">
                   {filteredLogs.map((log) => (
                     <Fragment key={log.id}>
-                    <tr className="hover:bg-white/[0.02] transition-colors">
+                    <tr className={`transition-colors ${filteredLogs.indexOf(log) === focusedIdx ? 'bg-foreground/[0.04]' : 'hover:bg-white/[0.02]'}`}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-muted-foreground text-opacity-70" />
