@@ -291,7 +291,7 @@ export default function Dashboard() {
         )}
 
         {/* Voice Health Card (master) */}
-        {isMaster && voiceHealth && (
+        {isMaster && voiceHealth && (voiceHealth.dials > 0 || Object.keys(voiceHealth.errors || {}).length > 0 || voiceHealth.registers > 0) && (
           <div className="bg-white dark:bg-[#0F0F12] rounded-xl p-6 border border-gray-200 dark:border-[#1F1F23]">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 text-left flex items-center gap-2">
               <Activity className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-50" />
