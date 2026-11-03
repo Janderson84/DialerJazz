@@ -562,7 +562,7 @@ router.get('/export', async (req: AuthenticatedRequest, res, next) => {
       const s2 = v === null || v === undefined ? '' : String(v);
       return /[",\n]/.test(s2) ? `"${s2.replace(/"/g, '""')}"` : s2;
     };
-    const header = ['date', 'rep', 'lead_name', 'company', 'from', 'to', 'direction', 'duration_seconds', 'disposition', 'notes', 'recording'];
+    const header = ['date', 'rep', 'lead_name', 'company', 'from', 'to', 'direction', 'duration_seconds', 'disposition', 'notes', 'transcript', 'recording'];
     const lines = [header.join(',')];
     for (const r of all) {
       const lead = Array.isArray(r.leads) ? r.leads[0] : r.leads;
@@ -578,6 +578,7 @@ router.get('/export', async (req: AuthenticatedRequest, res, next) => {
         esc(r.duration_seconds),
         esc(r.disposition),
         esc(r.notes),
+        esc(r.transcription),
         esc(r.recording_url),
       ].join(','));
     }
