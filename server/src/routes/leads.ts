@@ -104,21 +104,22 @@ router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunct
     // Call-attempt counts for the page's leads (how many times each was
     // dialed + last outcome) so dead numbers are visible at a glance.
     const pageIds = (data || []).map((l: any) => l.id);
-    let attemptsByLead: Record<string, { attempts: number; last_disposition: string | null }> = {};
+    let attemptsByLead: Record<string, { attempts: number; last_disposition: string | null; last_call_at: string | null }> = {};
     if (pageIds.length) {
       const idsCsv = pageIds.map((id: string) => `"${id}"`).join(',');
       const admin = await adminFetch();
       const clRes = await fetch(
-        `${admin.base}/api/database/records/call_logs?lead_id=in.(${idsCsv})&select=lead_id,disposition&order=created_at.desc&limit=1000`,
+        `${admin.base}/api/database/records/call_logs?lead_id=in.(${idsCsv})&select=lead_id,disposition,started_at&order=started_at.desc&limit=1000`,
         { headers: admin.headers() }
       ).catch(() => null);
       if (clRes && clRes.ok) {
         const rows = ((await clRes.json()) || []) as any[];
         for (const r of rows) {
           const key = String(r.lead_id);
-          const a = attemptsByLead[key] || { attempts: 0, last_disposition: null };
+          const a = attemptsByLead[key] || { attempts: 0, last_disposition: null, last_call_at: null };
           a.attempts += 1;
           if (!a.last_disposition) a.last_disposition = r.disposition || null;
+          if (!a.last_call_at) a.last_call_at = r.started_at || r.created_at || null;
           attemptsByLead[key] = a;
         }
       }
@@ -127,6 +128,7 @@ router.get('/', async (req: AuthenticatedRequest, res: Response, next: NextFunct
       ...l,
       call_attempts: attemptsByLead[String(l.id)]?.attempts || 0,
       last_disposition: attemptsByLead[String(l.id)]?.last_disposition || null,
+      last_call_at: attemptsByLead[String(l.id)]?.last_call_at || null,
     }));
 
     const total = count || 0;

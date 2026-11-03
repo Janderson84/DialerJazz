@@ -439,6 +439,11 @@ export default function LeadsPage() {
                       {/* Date */}
                       <td className="px-4 py-4 text-xs">
                         {new Date(lead.created_at).toLocaleDateString()}
+                        {(lead as any).last_call_at && (
+                          <span className="block text-[10px] text-muted-foreground">
+                            last call {new Date((lead as any).last_call_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}
