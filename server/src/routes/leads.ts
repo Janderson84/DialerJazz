@@ -420,19 +420,20 @@ router.get('/export', requireAuth, async (req: AuthenticatedRequest & { user?: a
     if (error) throw new ApiError(500, error.message, 'db_error');
 
     // attempts per lead for context
-    const attemptsByLead = new Map<string, { n: number; last: string | null }>();
+    const attemptsByLead = new Map<string, { n: number; last: string | null; disp: string | null }>();
     if ((data || []).length) {
       const idsCsv = (data as any[]).map((l) => `"${l.id}"`).join(',');
       const admin = await adminFetch();
       const clRes = await fetch(
-        `${admin.base}/api/database/records/call_logs?lead_id=in.(${idsCsv})&select=lead_id,started_at&order=started_at.desc&limit=5000`,
+        `${admin.base}/api/database/records/call_logs?lead_id=in.(${idsCsv})&select=lead_id,started_at,disposition&order=started_at.desc&limit=5000`,
         { headers: admin.headers() }
       ).catch(() => null);
       if (clRes && clRes.ok) {
         for (const r of ((await clRes.json()) || []) as any[]) {
-          const cur = attemptsByLead.get(String(r.lead_id)) || { n: 0, last: null };
+          const cur = attemptsByLead.get(String(r.lead_id)) || { n: 0, last: null, disp: null };
           cur.n += 1;
           if (!cur.last) cur.last = r.started_at || null;
+          if (!cur.disp) cur.disp = r.disposition || null;
           attemptsByLead.set(String(r.lead_id), cur);
         }
       }
@@ -442,10 +443,10 @@ router.get('/export', requireAuth, async (req: AuthenticatedRequest & { user?: a
       const s = v === null || v === undefined ? '' : String(v);
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const header = 'first_name,last_name,company,phone,email,state,status,tags,call_attempts,last_call_at,created_at';
+    const header = 'first_name,last_name,company,phone,email,state,status,tags,call_attempts,last_call_at,last_disposition,created_at';
     const lines = (data || []).map((l: any) => [
       esc(l.first_name), esc(l.last_name), esc(l.company), esc(l.phone), esc(l.email),
-      esc(l.state), esc(l.status), esc((l.tags || []).join('; ')), esc(attemptsByLead.get(String(l.id))?.n || 0), esc(attemptsByLead.get(String(l.id))?.last || ''), esc(l.created_at),
+      esc(l.state), esc(l.status), esc((l.tags || []).join('; ')), esc(attemptsByLead.get(String(l.id))?.n || 0), esc(attemptsByLead.get(String(l.id))?.last || ''), esc(attemptsByLead.get(String(l.id))?.disp || ''), esc(l.created_at),
     ].join(','));
 
     res.header('Content-Type', 'text/csv');
