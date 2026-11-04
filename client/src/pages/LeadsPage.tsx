@@ -124,6 +124,9 @@ export default function LeadsPage() {
 
   const handleStatusFilterChange = (status: string) => {
     setStatusFilter(status);
+    const url = new URL(window.location.href);
+    if (status) url.searchParams.set('status', status); else url.searchParams.delete('status');
+    window.history.replaceState({}, '', url.toString());
     setCurrentPage(1);
   };
 
