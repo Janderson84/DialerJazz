@@ -284,6 +284,19 @@ export default function Dashboard() {
                       <p className="text-xs text-muted-foreground">{f.lead_phone}</p>
                     ) : null}
                   </div>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        await followupsApi.update(f.id, { status: 'done' });
+                        setFollowUps(followUps.filter((x) => x.id !== f.id));
+                      } catch { /* ignore */ }
+                    }}
+                    className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors shrink-0"
+                    title="Mark this callback done"
+                  >
+                    ✓
+                  </button>
                   {f.lead_phone && (
                     <button
                       onClick={() => navigate(`/dialer?tel=${encodeURIComponent(f.lead_phone!)}`)}
