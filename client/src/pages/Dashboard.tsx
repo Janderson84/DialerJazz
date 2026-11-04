@@ -23,6 +23,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const isMaster = user?.id === 'a4d41720-59e1-4850-8b15-e8841872e702';
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
+  const [fuRepFilter, setFuRepFilter] = useState('');
 
   const fetchCampaigns = useCallback(async () => {
     try {
@@ -228,8 +229,31 @@ export default function Dashboard() {
             Callbacks due
             <span className="text-xs font-semibold text-muted-foreground ml-1">{followUps.length}</span>
           </h2>
+          {(() => {
+            const reps = [...new Set(followUps.map((f: any) => (f as any).rep_name).filter(Boolean))];
+            if (reps.length < 2) return null;
+            return (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <button
+                  onClick={() => setFuRepFilter('')}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${!fuRepFilter ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+                >
+                  All
+                </button>
+                {reps.map((rp) => (
+                  <button
+                    key={String(rp)}
+                    onClick={() => setFuRepFilter(String(rp))}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${fuRepFilter === rp ? 'bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+                  >
+                    {String(rp)}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
           <div className="space-y-2">
-            {followUps.slice(0, 6).map((f) => {
+            {followUps.filter((f: any) => !fuRepFilter || (f as any).rep_name === fuRepFilter).slice(0, 6).map((f) => {
               const due = new Date(f.due_at);
               const overdue = due.getTime() < Date.now();
               const dateStr = due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
