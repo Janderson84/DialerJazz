@@ -297,6 +297,21 @@ export default function Dashboard() {
                   >
                     ✓
                   </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        const next = new Date(Date.now() + 86400000);
+                        await followupsApi.update(f.id, { due_at: next.toISOString() });
+                        setFollowUps(followUps.map((x) => x.id === f.id ? { ...x, due_at: next.toISOString() } : x));
+                        toast.info('Snoozed to tomorrow');
+                      } catch { /* ignore */ }
+                    }}
+                    className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                    title="Snooze to tomorrow"
+                  >
+                    ⏱
+                  </button>
                   {f.lead_phone && (
                     <button
                       onClick={() => navigate(`/dialer?tel=${encodeURIComponent(f.lead_phone!)}`)}
