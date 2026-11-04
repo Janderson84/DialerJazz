@@ -59,6 +59,11 @@ export default function CampaignsTable({ campaigns }: CampaignsTableProps) {
       (!statusFilter || campaign.status.toLowerCase() === statusFilter.toLowerCase()) &&
       (!nameFilter || campaign.name.toLowerCase().includes(nameFilter.toLowerCase()))
     );
+  }).sort((a, b) => {
+    // Stale first: campaigns with the oldest (or missing) last-call date on top.
+    const ta = a.last_call_at ? new Date(a.last_call_at).getTime() : 0;
+    const tb = b.last_call_at ? new Date(b.last_call_at).getTime() : 0;
+    return ta - tb;
   });
 
   const toggleColumn = (col: string) => {
