@@ -271,9 +271,13 @@ export default function Dashboard() {
                     <span className="text-[11px] text-muted-foreground">{timeStr}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">
+                    <button
+                      onClick={() => { if (f.lead_phone) navigate(`/leads?search=${encodeURIComponent(f.lead_phone)}`); }}
+                      className="text-sm font-semibold text-foreground truncate hover:underline text-left"
+                      title="Open this lead"
+                    >
                       {f.lead_name || f.lead_phone || 'Callback'}
-                    </p>
+                    </button>
                     {f.notes ? (
                       <p className="text-xs text-muted-foreground truncate">{f.notes}</p>
                     ) : f.lead_phone && f.lead_name ? (
