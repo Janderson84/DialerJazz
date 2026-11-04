@@ -52,6 +52,7 @@ export default function CampaignsTable({ campaigns }: CampaignsTableProps) {
   }, [campaigns]);
   const [statusFilter, setStatusFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
+  const [staleFirst, setStaleFirst] = useState(false);
   const navigate = useNavigate();
 
   const filteredData = campaigns.filter((campaign) => {
@@ -60,10 +61,14 @@ export default function CampaignsTable({ campaigns }: CampaignsTableProps) {
       (!nameFilter || campaign.name.toLowerCase().includes(nameFilter.toLowerCase()))
     );
   }).sort((a, b) => {
-    // Stale first: campaigns with the oldest (or missing) last-call date on top.
-    const ta = a.last_call_at ? new Date(a.last_call_at).getTime() : 0;
-    const tb = b.last_call_at ? new Date(b.last_call_at).getTime() : 0;
-    return ta - tb;
+    if (staleFirst) {
+      // Stale first: campaigns with the oldest (or missing) last-call date on top.
+      const ta = a.last_call_at ? new Date(a.last_call_at).getTime() : 0;
+      const tb = b.last_call_at ? new Date(b.last_call_at).getTime() : 0;
+      return ta - tb;
+    }
+    // Default: newest campaigns first.
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
   const toggleColumn = (col: string) => {
@@ -99,6 +104,13 @@ export default function CampaignsTable({ campaigns }: CampaignsTableProps) {
             onChange={(e) => setNameFilter(e.target.value)}
             className="w-48 xl:w-64"
           />
+          <button
+            onClick={() => setStaleFirst(v => !v)}
+            className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors border ${staleFirst ? 'bg-foreground text-background border-foreground' : 'bg-surface border-black/5 dark:border-white/5 text-muted-foreground hover:text-foreground'}`}
+            title="Show the least-recently-dialed campaigns first"
+          >
+            {staleFirst ? '★ Stale first' : 'Stale first'}
+          </button>
           <Input
             placeholder="Filter by status... (e.g. active)"
             value={statusFilter}
