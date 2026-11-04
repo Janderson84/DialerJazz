@@ -45,7 +45,7 @@ export default function LeadsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(() => new URLSearchParams(window.location.search).get('status') || '');
-  const [deadFilter, setDeadFilter] = useState(false);
+  const [deadFilter, setDeadFilter] = useState(() => new URLSearchParams(window.location.search).get('min_attempts') === '3');
   const [historyLead, setHistoryLead] = useState<any | null>(null);
   const [historyCalls, setHistoryCalls] = useState<any[]>([]);
   const [historySms, setHistorySms] = useState<any[]>([]);
@@ -206,7 +206,14 @@ export default function LeadsPage() {
             </button>
           )}
           <button
-            onClick={() => { setDeadFilter(v => !v); setCurrentPage(1); }}
+            onClick={() => {
+              const next = !deadFilter;
+              setDeadFilter(next);
+              setCurrentPage(1);
+              const url = new URL(window.location.href);
+              if (next) url.searchParams.set('min_attempts', '3'); else url.searchParams.delete('min_attempts');
+              window.history.replaceState({}, '', url.toString());
+            }}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
               deadFilter
                 ? 'bg-red-500/10 text-red-400 border-red-500/30'
