@@ -28,6 +28,28 @@ router.get('/', requireAuth, async (req: Request & { user?: any }, res: Response
     if (!isMaster(userId)) q = q.eq('user_id', userId);
     const { data, error } = await q;
     if (error) throw new Error(error.message);
+    // Master view: annotate the owning rep's name (team roster).
+    const nameByUser = new Map<string, string>();
+    if (isMaster(userId)) {
+      try {
+        const adminBase = process.env.INFORGE_URL || process.env.INSFORGE_URL || 'http://localhost:7130';
+        const adminUser = process.env.INSFORGE_ADMIN_USER || 'admin';
+        const adminPassword = process.env.INSFORGE_ADMIN_PASSWORD;
+        if (adminPassword) {
+          const s2 = await fetch(`${adminBase}/api/auth/admin/sessions`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: adminUser, password: adminPassword }),
+          });
+          if (s2.ok) {
+            const { accessToken } = await s2.json();
+            const members = await fetch(`${adminBase}/api/database/records/team_members?select=rep_user_id,display_name`, { headers: { Authorization: `Bearer ${accessToken}`, apikey: accessToken } }).then(r => r.json()).catch(() => null);
+            for (const m of (Array.isArray(members) ? members : members?.data || []) as any[]) {
+              if (m?.rep_user_id && m?.display_name) nameByUser.set(String(m.rep_user_id), String(m.display_name));
+            }
+          }
+        }
+      } catch { /* optional annotation */ }
+    }
     const rows = (data || []).map((r: any) => {
       const lead = Array.isArray(r.leads) ? r.leads[0] : r.leads;
       return {
@@ -35,6 +57,7 @@ router.get('/', requireAuth, async (req: Request & { user?: any }, res: Response
         lead_name: lead ? [lead.first_name, lead.last_name].filter(Boolean).join(' ') || lead.company || null : null,
         lead_phone: lead?.phone || null,
         lead_company: lead?.company || null,
+        rep_name: nameByUser.get(String(r.user_id)) || null,
         leads: undefined,
       };
     });

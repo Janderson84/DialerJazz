@@ -243,6 +243,7 @@ export default function Dashboard() {
                     <span className={cn('text-xs font-bold', overdue ? 'text-amber-500' : 'text-foreground')}>
                       {overdue ? 'Now' : dateStr}
                     </span>
+                    {(f as any).rep_name && <span className="text-[10px] text-muted-foreground">{(f as any).rep_name}</span>}
                     <span className="text-[11px] text-muted-foreground">{timeStr}</span>
                   </div>
                   <div className="flex-1 min-w-0">

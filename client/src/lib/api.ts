@@ -541,6 +541,7 @@ export interface FollowUp {
   lead_name?: string | null;
   lead_phone?: string | null;
   lead_company?: string | null;
+  rep_name?: string | null;
 }
 
 export const followupsApi = {
