@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [teamPulse, setTeamPulse] = useState<TeamPulseRow[]>([]);
   const [voiceHealth, setVoiceHealth] = useState<{ dials: number; calls_accepted: number; registers: number; re_register_attempts: number; errors: Record<string, number> } | null>(null);
+  const [diagEvents, setDiagEvents] = useState<{ ts: string; event: string; detail?: string }[]>([]);
   const { user } = useAuth();
   const isMaster = user?.id === 'a4d41720-59e1-4850-8b15-e8841872e702';
   const [followUps, setFollowUps] = useState<FollowUp[]>([]);
@@ -79,6 +80,7 @@ export default function Dashboard() {
     try {
       const { data } = await apiFetch<any>('/diag/summary');
       setVoiceHealth(data?.data || data);
+      apiFetch<any>('/diag/events').then(({ data: ev }) => setDiagEvents((ev as any)?.events || ev || [])).catch(() => {});
     } catch {
       // non-fatal
     }
@@ -366,9 +368,23 @@ export default function Dashboard() {
               </div>
             </div>
             {Object.keys(voiceHealth.errors || {}).length > 0 && (
-              <p className="text-xs text-muted-foreground mt-3">
-                {Object.entries(voiceHealth.errors).map(([k, v]) => `${k} (${v})`).join(' · ')}
-              </p>
+              <div className="mt-3">
+                <p className="text-xs text-muted-foreground">
+                  {Object.entries(voiceHealth.errors).map(([k, v]) => `${k} (${v})`).join(' · ')}
+                </p>
+                <details className="mt-2">
+                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Raw events</summary>
+                  <div className="mt-2 max-h-48 overflow-auto rounded-lg border border-gray-200 dark:border-[#1F1F23] divide-y divide-gray-100 dark:divide-[#1F1F23]">
+                    {diagEvents.filter(e => e.event.includes('error') || e.event.includes('re_register')).slice(-20).reverse().map((e, i) => (
+                      <div key={i} className="px-3 py-1.5 text-[11px] flex gap-2">
+                        <span className="text-muted-foreground shrink-0">{new Date(e.ts).toLocaleTimeString()}</span>
+                        <span className="font-mono shrink-0">{e.event}</span>
+                        <span className="text-muted-foreground truncate">{e.detail || ''}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
             )}
           </div>
         )}
