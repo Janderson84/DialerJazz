@@ -89,9 +89,13 @@ export default function LeadsPage() {
     fetchLeads();
   }, [fetchLeads]);
 
+
   const openHistory = useCallback(async (lead: any) => {
     setHistoryLead(lead);
     setDrawerNotes(lead.notes || '');
+    const url = new URL(window.location.href);
+    url.searchParams.set('lead', lead.id);
+    window.history.replaceState({}, '', url.toString());
     setFollowUpDue('');
     setHistoryLoading(true);
     try {
@@ -110,6 +114,15 @@ export default function LeadsPage() {
       setHistoryLoading(false);
     }
   }, []);
+
+  // Deep link: /leads?lead=<id> opens that lead's drawer directly.
+  const leadParam = new URLSearchParams(window.location.search).get('lead');
+  useEffect(() => {
+    if (!leadParam) return;
+    leadsApi.byId(leadParam).then(({ data }) => {
+      if (data) openHistory(data);
+    }).catch(() => {});
+  }, [leadParam, openHistory]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -467,7 +480,12 @@ export default function LeadsPage() {
       {/* Lead history drawer */}
       {historyLead && (
         <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setHistoryLead(null)}>
-          <div className="absolute inset-0 bg-black/40" />
+          <div className="absolute inset-0 bg-black/40" onClick={() => {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('lead');
+            window.history.replaceState({}, '', url.toString());
+            setHistoryLead(null);
+          }} />
           <div className="relative bg-background border-l border-black/5 dark:border-white/5 w-full max-w-md h-full overflow-auto p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -614,7 +632,12 @@ export default function LeadsPage() {
                   </button>
                 </div>
               </div>
-              <button onClick={() => setHistoryLead(null)} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
+              <button onClick={() => {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('lead');
+                window.history.replaceState({}, '', url.toString());
+                setHistoryLead(null);
+              }} className="text-muted-foreground hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
             {historyLoading ? (
               <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>

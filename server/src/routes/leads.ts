@@ -570,3 +570,16 @@ router.patch('/:id/details', requireAuth, async (req: AuthenticatedRequest, res:
     next(error);
   }
 });
+
+// GET /api/leads/id/:id — single lead fetch for deep links.
+router.get('/id/:id', requireAuth, async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  try {
+    let q = req.db!.database.from('leads').select('*').eq('id', req.params.id);
+    if (req.user.id !== MASTER_ID()) q = q.eq('user_id', req.user.id);
+    const { data, error } = await q.single();
+    if (error || !data) throw new ApiError(404, 'Lead not found', 'not_found');
+    res.json({ data });
+  } catch (error) {
+    next(error);
+  }
+});

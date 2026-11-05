@@ -256,6 +256,8 @@ export const leadsApi = {
       body: JSON.stringify(patch),
     }),
 
+  byId: (id: string) => apiFetch<Lead>(`/leads/id/${id}`),
+
   byPhone: (phone: string) =>
     apiFetch<Lead | null>(`/leads/by-phone/${encodeURIComponent(phone)}`),
 
