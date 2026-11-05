@@ -15,6 +15,10 @@ export default function ManualDialerPage() {
   const voice = useVoice();
 
   const [numberInput, setNumberInput] = useState('');
+  const [leadInfo, setLeadInfo] = useState<{ name: string; status: string; attempts: number } | null>(null);
+  const leadLookupRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+
   const [showDTMF, setShowDTMF] = useState(false);
   // The number actually passed to voice.dial() — the input can be edited
   // mid-call, so we snapshot it for the call log.
@@ -113,6 +117,27 @@ export default function ManualDialerPage() {
 
   const isInCall = ['trying', 'ringing', 'active'].includes(voice.primaryCallState);
 
+  // Debounced lead lookup: as the rep types a known number, show its context.
+  useEffect(() => {
+    if (leadLookupRef.current) clearTimeout(leadLookupRef.current);
+    setLeadInfo(null);
+    const digits = numberInput.replace(/\D/g, '');
+    if (digits.length < 10 || isInCall) return;
+    leadLookupRef.current = setTimeout(async () => {
+      try {
+        const { data: lead } = await leadsApi.byPhone(numberInput.trim());
+        if (lead) {
+          setLeadInfo({
+            name: [lead.first_name, lead.last_name].filter(Boolean).join(' ') || 'Known lead',
+            status: lead.status || 'new',
+            attempts: (lead as any).call_attempts || 0,
+          });
+        }
+      } catch { /* ignore */ }
+    }, 450);
+    return () => { if (leadLookupRef.current) clearTimeout(leadLookupRef.current); };
+  }, [numberInput, isInCall]);
+
   return (
     <div className="flex flex-col h-full bg-background animate-in fade-in duration-700">
       {/* Top Header */}
@@ -155,6 +180,11 @@ export default function ManualDialerPage() {
                    placeholder="(555) 000-0000"
                    disabled={isInCall}
                  />
+                 {leadInfo && !isInCall && (
+                   <div className={`absolute bottom-1 left-0 right-0 text-center text-[11px] ${leadInfo.status === 'dnc' ? 'text-red-400' : 'text-muted-foreground'}`}>
+                     {leadInfo.name} · {leadInfo.status.replace('_', ' ')}{leadInfo.attempts > 0 ? ` · ${leadInfo.attempts}× dialed` : ''}
+                   </div>
+                 )}
                  <button 
                    onClick={handleDelete} 
                    disabled={isInCall || numberInput.length === 0}

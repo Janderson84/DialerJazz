@@ -525,7 +525,21 @@ router.get('/by-phone/:phone', requireAuth, async (req: AuthenticatedRequest, re
     if (req.user.id !== MASTER_ID()) q = q.eq('user_id', req.user.id);
     const { data, error } = await q;
     if (error) throw new ApiError(500, error.message, 'db_error');
-    res.json({ data: data?.[0] || null });
+    const lead = data?.[0] || null;
+    // Attach attempt count for the manual-dialer context line.
+    let call_attempts = 0;
+    if (lead) {
+      try {
+        const admin = await adminFetch();
+        const cl = await fetch(`${admin.base}/api/database/records/call_logs?lead_id=eq.${lead.id}&select=id&limit=100`, { headers: admin.headers() });
+        if (cl.ok) {
+          const payload: any = await cl.json();
+          const rows = (Array.isArray(payload) ? payload : payload?.data || []) as any[];
+          call_attempts = rows.length;
+        }
+      } catch { /* optional */ }
+    }
+    res.json({ data: lead ? { ...lead, call_attempts } : null });
   } catch (error) {
     next(error);
   }
