@@ -46,6 +46,7 @@ export default function LeadsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(() => new URLSearchParams(window.location.search).get('status') || '');
   const [deadFilter, setDeadFilter] = useState(() => new URLSearchParams(window.location.search).get('min_attempts') === '3');
+  const [deadCount, setDeadCount] = useState<number | null>(null);
   const [historyLead, setHistoryLead] = useState<any | null>(null);
   const [historyCalls, setHistoryCalls] = useState<any[]>([]);
   const [historySms, setHistorySms] = useState<any[]>([]);
@@ -88,6 +89,15 @@ export default function LeadsPage() {
   useEffect(() => {
     fetchLeads();
   }, [fetchLeads]);
+
+  // Dead-number count for the chip label (master sees all leads anyway).
+  useEffect(() => {
+    let alive = true;
+    leadsApi.listAll({ min_attempts: 3, per_page: 1 }).then(({ meta }) => {
+      if (alive) setDeadCount((meta as any)?.total ?? null);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
 
   const openHistory = useCallback(async (lead: any) => {
@@ -233,7 +243,7 @@ export default function LeadsPage() {
                 : 'bg-surface border-black/5 dark:border-white/5 text-muted-foreground hover:border-foreground/30 hover:text-foreground'
             }`}
           >
-            ☎️ 3+ dials
+            ☎️ 3+ dials{deadCount !== null ? ` (${deadCount})` : ''}
           </button>
           {statusFilter && (
             <span className="h-2 w-2 rounded-full bg-background" />
