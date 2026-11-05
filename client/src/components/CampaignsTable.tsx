@@ -52,7 +52,7 @@ export default function CampaignsTable({ campaigns }: CampaignsTableProps) {
   }, [campaigns]);
   const [statusFilter, setStatusFilter] = useState("");
   const [nameFilter, setNameFilter] = useState("");
-  const [staleFirst, setStaleFirst] = useState(false);
+  const [staleFirst, setStaleFirst] = useState(() => localStorage.getItem('ccm_stale_first') === '1');
   const navigate = useNavigate();
 
   const filteredData = campaigns.filter((campaign) => {
@@ -105,7 +105,11 @@ export default function CampaignsTable({ campaigns }: CampaignsTableProps) {
             className="w-48 xl:w-64"
           />
           <button
-            onClick={() => setStaleFirst(v => !v)}
+            onClick={() => setStaleFirst(v => {
+              const next = !v;
+              localStorage.setItem('ccm_stale_first', next ? '1' : '0');
+              return next;
+            })}
             className={`px-3 py-2 rounded-xl text-xs font-medium transition-colors border ${staleFirst ? 'bg-foreground text-background border-foreground' : 'bg-surface border-black/5 dark:border-white/5 text-muted-foreground hover:text-foreground'}`}
             title="Show the least-recently-dialed campaigns first"
           >
