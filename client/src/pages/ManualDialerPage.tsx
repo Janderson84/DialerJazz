@@ -182,9 +182,13 @@ export default function ManualDialerPage() {
                    disabled={isInCall}
                  />
                  {leadInfo && !isInCall && (
-                   <div className={`absolute bottom-1 left-0 right-0 text-center text-[11px] ${leadInfo.status === 'dnc' ? 'text-red-400' : 'text-muted-foreground'}`}>
+                   <button
+                     onClick={() => navigate(`/leads?search=${encodeURIComponent(numberInput.trim())}`)}
+                     className={`absolute bottom-1 left-0 right-0 text-center text-[11px] ${leadInfo.status === 'dnc' ? 'text-red-400 hover:text-red-300' : 'text-muted-foreground hover:text-foreground'} transition-colors`}
+                     title="Open this lead in the CRM"
+                   >
                      {leadInfo.name} · {leadInfo.status.replace('_', ' ')}{leadInfo.attempts > 0 ? ` · ${leadInfo.attempts}× dialed${leadInfo.last_disposition ? `, last ${leadInfo.last_disposition.replace('_', ' ')}` : ''}` : ''}
-                   </div>
+                   </button>
                  )}
                  <button 
                    onClick={handleDelete} 
