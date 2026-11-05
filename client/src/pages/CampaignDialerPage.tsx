@@ -823,6 +823,9 @@ export default function CampaignDialerPage() {
                 <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6">
                   <div className="w-full max-w-md rounded-2xl border border-border bg-background p-6 shadow-2xl space-y-4">
                     <h3 className="text-lg font-bold text-foreground text-center">Session recap</h3>
+                    <p className="text-xs text-muted-foreground text-center -mt-2">
+                      {campaign?.name || 'Campaign'} · {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    </p>
                     <div className="grid grid-cols-5 gap-2 text-center">
                       {(() => {
                         const sess = sessionOutcomesRef.current;
