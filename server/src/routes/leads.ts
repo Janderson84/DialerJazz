@@ -531,11 +531,12 @@ router.get('/by-phone/:phone', requireAuth, async (req: AuthenticatedRequest, re
     if (lead) {
       try {
         const admin = await adminFetch();
-        const cl = await fetch(`${admin.base}/api/database/records/call_logs?lead_id=eq.${lead.id}&select=id&limit=100`, { headers: admin.headers() });
+        const cl = await fetch(`${admin.base}/api/database/records/call_logs?lead_id=eq.${lead.id}&select=id,disposition&order=started_at.desc&limit=100`, { headers: admin.headers() });
         if (cl.ok) {
           const payload: any = await cl.json();
           const rows = (Array.isArray(payload) ? payload : payload?.data || []) as any[];
           call_attempts = rows.length;
+          (lead as any).last_disposition = rows[0]?.disposition || null;
         }
       } catch { /* optional */ }
     }

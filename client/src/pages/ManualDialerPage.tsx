@@ -15,7 +15,7 @@ export default function ManualDialerPage() {
   const voice = useVoice();
 
   const [numberInput, setNumberInput] = useState('');
-  const [leadInfo, setLeadInfo] = useState<{ name: string; status: string; attempts: number } | null>(null);
+  const [leadInfo, setLeadInfo] = useState<{ name: string; status: string; attempts: number; last_disposition?: string | null } | null>(null);
   const leadLookupRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 
@@ -131,6 +131,7 @@ export default function ManualDialerPage() {
             name: [lead.first_name, lead.last_name].filter(Boolean).join(' ') || 'Known lead',
             status: lead.status || 'new',
             attempts: (lead as any).call_attempts || 0,
+            last_disposition: (lead as any).last_disposition || null,
           });
         }
       } catch { /* ignore */ }
@@ -182,7 +183,7 @@ export default function ManualDialerPage() {
                  />
                  {leadInfo && !isInCall && (
                    <div className={`absolute bottom-1 left-0 right-0 text-center text-[11px] ${leadInfo.status === 'dnc' ? 'text-red-400' : 'text-muted-foreground'}`}>
-                     {leadInfo.name} · {leadInfo.status.replace('_', ' ')}{leadInfo.attempts > 0 ? ` · ${leadInfo.attempts}× dialed` : ''}
+                     {leadInfo.name} · {leadInfo.status.replace('_', ' ')}{leadInfo.attempts > 0 ? ` · ${leadInfo.attempts}× dialed${leadInfo.last_disposition ? `, last ${leadInfo.last_disposition.replace('_', ' ')}` : ''}` : ''}
                    </div>
                  )}
                  <button 
