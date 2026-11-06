@@ -410,7 +410,14 @@ export default function Dashboard() {
                     <div className="h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
                       <div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.round((r.calls / max) * 100)}%` }} />
                     </div>
-                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 truncate">{r.name.split(' ')[0]} · {r.calls}</p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 truncate">
+                      {r.name.split(' ')[0]} · {r.calls}
+                      {r.calls > 0 && (() => {
+                        const rate = (r.connected / r.calls) * 100;
+                        const color = rate >= 3 ? 'text-emerald-500' : rate >= 1 ? 'text-amber-500' : 'text-red-500';
+                        return <span className={`ml-1 font-semibold ${color}`}>{rate.toFixed(1)}%</span>;
+                      })()}
+                    </p>
                   </div>
                 ))}
               </div>
