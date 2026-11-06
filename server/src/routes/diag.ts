@@ -35,7 +35,8 @@ router.get('/events', (req: AuthenticatedRequest, res: Response) => {
 // register/recover cycles — enough to spot pacing problems (31206 rate
 // limits correlate with dial speed) without reading raw events.
 router.get('/summary', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  const since = Date.now() - 6 * 60 * 60 * 1000; // last 6h window
+  const hours = Math.min(Math.max(Number((req.query as any).hours) || 6, 1), 168);
+  const since = Date.now() - hours * 60 * 60 * 1000;
   const recent = events.filter((e) => Date.now() - new Date(e.ts).getTime() <= since);
   const count = (name: string) => recent.filter((e) => e.event === name).length;
   const errors: Record<string, number> = {};
@@ -60,7 +61,7 @@ router.get('/summary', requireAuth, (req: AuthenticatedRequest, res: Response) =
     if (isAccepted) byRep[key].accepted += 1;
   }
   res.json({
-    window_hours: 6,
+    window_hours: hours,
     dials: count('voice.dial'),
     calls_accepted: count('call.accepted'),
     registers: count('device.register.done') + count('device.re_register.done'),

@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [isTelnyxConnected, setIsTelnyxConnected] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [teamPulse, setTeamPulse] = useState<TeamPulseRow[]>([]);
+  const [voiceWindow, setVoiceWindow] = useState(6);
   const [voiceHealth, setVoiceHealth] = useState<{ dials: number; calls_accepted: number; registers: number; re_register_attempts: number; errors: Record<string, number>; by_rep?: Record<string, { registers: number; errors: number; dials: number; accepted: number }> } | null>(null);
   const [diagEvents, setDiagEvents] = useState<{ ts: string; event: string; detail?: string }[]>([]);
   const { user } = useAuth();
@@ -74,12 +75,12 @@ export default function Dashboard() {
     } catch {
       // non-fatal
     }
-  }, []);
+  }, [isMaster, voiceWindow]);
 
   const fetchVoiceHealth = useCallback(async () => {
     if (!isMaster) return;
     try {
-      const { data } = await apiFetch<any>('/diag/summary');
+      const { data } = await apiFetch<any>(`/diag/summary?hours=${voiceWindow}`);
       setVoiceHealth(data?.data || data);
       apiFetch<any>('/diag/events').then(({ data: ev }) => setDiagEvents((ev as any)?.events || ev || [])).catch(() => {});
     } catch {
@@ -361,7 +362,10 @@ export default function Dashboard() {
           <div className="bg-white dark:bg-[#0F0F12] rounded-xl p-6 border border-gray-200 dark:border-[#1F1F23]">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4 text-left flex items-center gap-2">
               <Activity className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-50" />
-              Voice health — last 6h
+              Voice health — last {voiceWindow}h
+              <button onClick={() => setVoiceWindow(voiceWindow === 6 ? 24 : 6)} className="text-[11px] text-muted-foreground underline decoration-dotted hover:text-foreground ml-1">
+                switch to {voiceWindow === 6 ? '24h' : '6h'}
+              </button>
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
               <div><p className="text-2xl font-bold">{voiceHealth.dials}</p><p className="text-xs text-muted-foreground">dials</p></div>
