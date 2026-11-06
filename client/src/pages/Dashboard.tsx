@@ -306,15 +306,17 @@ export default function Dashboard() {
                   <button
                     onClick={async (e) => {
                       e.stopPropagation();
+                      const days = Number(window.prompt('Snooze for how many days?', '1'));
+                      if (!days || days < 1) return;
                       try {
-                        const next = new Date(Date.now() + 86400000);
+                        const next = new Date(Date.now() + days * 86400000);
                         await followupsApi.update(f.id, { due_at: next.toISOString() });
                         setFollowUps(followUps.map((x) => x.id === f.id ? { ...x, due_at: next.toISOString() } : x));
-                        toast.info('Snoozed to tomorrow');
+                        toast.info(`Snoozed ${days} day${days > 1 ? 's' : ''}`);
                       } catch { /* ignore */ }
                     }}
                     className="px-2 py-1 rounded-lg text-[11px] font-semibold bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                    title="Snooze to tomorrow"
+                    title="Snooze (prompts for days)"
                   >
                     ⏱
                   </button>
