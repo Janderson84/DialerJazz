@@ -401,6 +401,21 @@ export default function Dashboard() {
             <Users className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-50" />
             Team Pulse
           </h2>
+          {teamPulse.length > 1 && (() => {
+            const max = Math.max(...teamPulse.map((r) => r.calls), 1);
+            return (
+              <div className="flex gap-3 mb-3">
+                {[...teamPulse].sort((a, b) => b.calls - a.calls).map((r) => (
+                  <div key={r.rep_user_id} className="flex-1 min-w-0">
+                    <div className="h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                      <div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.round((r.calls / max) * 100)}%` }} />
+                    </div>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-1 truncate">{r.name.split(' ')[0]} · {r.calls}</p>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <div className="flex gap-1 ml-auto">
             {(['today', 'week', 'month'] as const).map(r => (
               <button
