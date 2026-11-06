@@ -45,6 +45,16 @@ router.get('/summary', requireAuth, (req: AuthenticatedRequest, res: Response) =
       errors[kind] = (errors[kind] || 0) + 1;
     }
   }
+  const byRep: Record<string, { registers: number; errors: number }> = {};
+  for (const e of recent) {
+    const isReg = e.event === 'device.register.done' || e.event === 'device.re_register.done';
+    const isErr = e.event === 'device.error' || e.event === 'call.error.early';
+    if (!isReg && !isErr) continue;
+    const key = e.userId;
+    byRep[key] = byRep[key] || { registers: 0, errors: 0 };
+    if (isReg) byRep[key].registers += 1;
+    if (isErr) byRep[key].errors += 1;
+  }
   res.json({
     window_hours: 6,
     dials: count('voice.dial'),
@@ -53,6 +63,7 @@ router.get('/summary', requireAuth, (req: AuthenticatedRequest, res: Response) =
     re_register_attempts: count('device.re_register.attempt'),
     re_register_failures: count('device.re_register.fail'),
     errors,
+    by_rep: byRep,
     last_event: recent.length ? recent[recent.length - 1].ts : null,
   });
 });

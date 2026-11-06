@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import CampaignsTable from '@/components/CampaignsTable';
 import { campaignsApi, settingsApi, statsApi, followupsApi, apiFetch, type Campaign, type FollowUp } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+const MASTER_ID = 'a4d41720-59e1-4850-8b15-e8841872e702';
 
 type TeamPulseRow = { rep_user_id: string; name: string; is_master: boolean; calls: number; connected: number; talk_secs: number; appointments?: number; overdue_callbacks?: number; prev_connected?: number | null; wrong_numbers?: number };
 
@@ -19,7 +20,7 @@ export default function Dashboard() {
   const [isTelnyxConnected, setIsTelnyxConnected] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [teamPulse, setTeamPulse] = useState<TeamPulseRow[]>([]);
-  const [voiceHealth, setVoiceHealth] = useState<{ dials: number; calls_accepted: number; registers: number; re_register_attempts: number; errors: Record<string, number> } | null>(null);
+  const [voiceHealth, setVoiceHealth] = useState<{ dials: number; calls_accepted: number; registers: number; re_register_attempts: number; errors: Record<string, number>; by_rep?: Record<string, { registers: number; errors: number }> } | null>(null);
   const [diagEvents, setDiagEvents] = useState<{ ts: string; event: string; detail?: string }[]>([]);
   const { user } = useAuth();
   const isMaster = user?.id === 'a4d41720-59e1-4850-8b15-e8841872e702';
@@ -373,6 +374,15 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground">SDK errors</p>
               </div>
             </div>
+            {voiceHealth.by_rep && Object.keys(voiceHealth.by_rep).length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {Object.entries(voiceHealth.by_rep).map(([rep, v]) => (
+                  <span key={rep} className="text-[11px] text-muted-foreground">
+                    {rep === MASTER_ID ? 'you' : rep.slice(0, 8)} · {v.registers} reg{v.errors ? `, ${v.errors} err` : ''}
+                  </span>
+                ))}
+              </div>
+            )}
             {Object.keys(voiceHealth.errors || {}).length > 0 && (
               <div className="mt-3">
                 <p className="text-xs text-muted-foreground">
