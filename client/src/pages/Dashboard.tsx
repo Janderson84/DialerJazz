@@ -406,7 +406,7 @@ export default function Dashboard() {
             return (
               <div className="flex gap-3 mb-3">
                 {[...teamPulse].sort((a, b) => b.calls - a.calls).map((r) => (
-                  <div key={r.rep_user_id} className="flex-1 min-w-0">
+                  <div key={r.rep_user_id} onClick={() => navigate(`/call-logs?rep=${r.rep_user_id}`)} title={`View ${r.name}'s call history`} className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity">
                     <div className="h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
                       <div className="h-full rounded-full bg-sky-500" style={{ width: `${Math.round((r.calls / max) * 100)}%` }} />
                     </div>
