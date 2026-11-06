@@ -20,7 +20,7 @@ export default function Dashboard() {
   const [isTelnyxConnected, setIsTelnyxConnected] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [teamPulse, setTeamPulse] = useState<TeamPulseRow[]>([]);
-  const [voiceHealth, setVoiceHealth] = useState<{ dials: number; calls_accepted: number; registers: number; re_register_attempts: number; errors: Record<string, number>; by_rep?: Record<string, { registers: number; errors: number }> } | null>(null);
+  const [voiceHealth, setVoiceHealth] = useState<{ dials: number; calls_accepted: number; registers: number; re_register_attempts: number; errors: Record<string, number>; by_rep?: Record<string, { registers: number; errors: number; dials: number; accepted: number }> } | null>(null);
   const [diagEvents, setDiagEvents] = useState<{ ts: string; event: string; detail?: string }[]>([]);
   const { user } = useAuth();
   const isMaster = user?.id === 'a4d41720-59e1-4850-8b15-e8841872e702';
@@ -378,7 +378,7 @@ export default function Dashboard() {
               <div className="mt-2 flex flex-wrap gap-2">
                 {Object.entries(voiceHealth.by_rep).map(([rep, v]) => (
                   <span key={rep} className="text-[11px] text-muted-foreground">
-                    {rep === MASTER_ID ? 'you' : rep.slice(0, 8)} · {v.registers} reg{v.errors ? `, ${v.errors} err` : ''}
+                    {rep === MASTER_ID ? 'you' : rep.slice(0, 8)} · {v.dials} dial{v.dials === 1 ? '' : 's'}{v.accepted ? `, ${v.accepted} conn` : ''}{v.errors ? `, ${v.errors} err` : ''}
                   </span>
                 ))}
               </div>

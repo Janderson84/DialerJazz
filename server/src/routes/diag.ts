@@ -45,15 +45,19 @@ router.get('/summary', requireAuth, (req: AuthenticatedRequest, res: Response) =
       errors[kind] = (errors[kind] || 0) + 1;
     }
   }
-  const byRep: Record<string, { registers: number; errors: number }> = {};
+  const byRep: Record<string, { registers: number; errors: number; dials: number; accepted: number }> = {};
   for (const e of recent) {
     const isReg = e.event === 'device.register.done' || e.event === 'device.re_register.done';
     const isErr = e.event === 'device.error' || e.event === 'call.error.early';
-    if (!isReg && !isErr) continue;
+    const isDial = e.event === 'voice.dial';
+    const isAccepted = e.event === 'call.accepted';
+    if (!isReg && !isErr && !isDial && !isAccepted) continue;
     const key = e.userId;
-    byRep[key] = byRep[key] || { registers: 0, errors: 0 };
+    byRep[key] = byRep[key] || { registers: 0, errors: 0, dials: 0, accepted: 0 };
     if (isReg) byRep[key].registers += 1;
     if (isErr) byRep[key].errors += 1;
+    if (isDial) byRep[key].dials += 1;
+    if (isAccepted) byRep[key].accepted += 1;
   }
   res.json({
     window_hours: 6,
