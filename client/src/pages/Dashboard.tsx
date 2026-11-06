@@ -69,7 +69,7 @@ export default function Dashboard() {
   const fetchFollowUps = useCallback(async () => {
     try {
       const { data } = await followupsApi.list('open');
-      setFollowUps(data || []);
+      setFollowUps((data || []).sort((a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime()));
     } catch {
       // non-fatal
     }
@@ -230,6 +230,10 @@ export default function Dashboard() {
             <CalendarClock className="w-4 h-4 text-sky-500" />
             Callbacks due
             <span className="text-xs font-semibold text-muted-foreground ml-1">{followUps.length}</span>
+            {(() => {
+              const today = followUps.filter((f) => { const d = new Date(f.due_at); return d.getTime() < new Date(new Date().setHours(23, 59, 59, 999)).getTime(); }).length;
+              return today > 0 ? <span className="text-xs font-semibold text-amber-500 ml-1">· {today} today</span> : null;
+            })()}
           </h2>
           {(() => {
             const reps = [...new Set(followUps.map((f: any) => (f as any).rep_name).filter(Boolean))];
