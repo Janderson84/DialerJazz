@@ -529,6 +529,8 @@ router.get('/export', async (req: AuthenticatedRequest, res, next) => {
     const { campaign_id, rep, from, to } = req.query;
 
     const filters: string[] = [];
+    const ids = String(req.query.ids || '').split(',').map((s) => s.trim()).filter((s) => /^[0-9a-f-]{36}$/i.test(s)).slice(0, 200);
+    if (ids.length) filters.push(`id=in.(${ids.join(',')})`);
     if (campaign_id) filters.push(`campaign_id=eq.${encodeURIComponent(String(campaign_id))}`);
     if (!isMaster) filters.push(`user_id=eq.${userId}`);
     else if (rep) filters.push(`user_id=eq.${encodeURIComponent(String(rep))}`);

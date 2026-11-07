@@ -61,6 +61,7 @@ export default function CallLogsPage() {
   const [poolHealth, setPoolHealth] = useState<{ campaign_id: string; name: string; remaining_pct: number; remaining: number; total_leads: number }[] | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCampaign, setSelectedCampaign] = useState<string>('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -251,8 +252,22 @@ export default function CallLogsPage() {
         </div>
       </div>
 
-      {/* Export CSV (respects current filters) */}
-      <div className="flex justify-end">
+      {/* Export CSV (respects current filters; selected rows override) */}
+      <div className="flex justify-end items-center gap-3">
+        {selectedRows.size > 0 && (
+          <span className="text-xs text-muted-foreground">{selectedRows.size} selected</span>
+        )}
+        {selectedRows.size > 0 && (
+          <button
+            onClick={() => {
+              const token = localStorage.getItem('jazz_access_token') || '';
+              window.open(`/api/calls/export?ids=${[...selectedRows].join(',')}&token=${encodeURIComponent(token)}`, '_blank');
+            }}
+            className="text-xs font-semibold text-foreground underline transition-colors"
+          >
+            Export selected
+          </button>
+        )}
         <button
           onClick={() => {
             const q = new URLSearchParams();
@@ -382,6 +397,17 @@ export default function CallLogsPage() {
                     <tr className={`transition-colors ${filteredLogs.indexOf(log) === focusedIdx ? 'bg-foreground/[0.04]' : 'hover:bg-white/[0.02]'}`}>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedRows.has(log.id)}
+                            onChange={(e) => {
+                              const next = new Set(selectedRows);
+                              if (e.target.checked) next.add(log.id); else next.delete(log.id);
+                              setSelectedRows(next);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-3.5 w-3.5 accent-[--foreground]"
+                          />
                           <Clock className="h-4 w-4 text-muted-foreground text-opacity-70" />
                           <span className="text-foreground">{formatDate(log.created_at)}</span>
                         </div>
